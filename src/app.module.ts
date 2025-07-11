@@ -4,6 +4,9 @@ import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module'
 import { KycModule } from './modules/kyc/kyc.module';
 import { ListingsModule } from './modules/listings/listings.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { EscrowModule } from './modules/escrow/escrow.module';
+import { CommissionsModule } from './modules/commissions/commissions.module';
 import databaseConfig from './config/database.config';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 @Module({
@@ -24,13 +27,15 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
           (process.env.NODE_ENV === 'production')
             ? cfg.get<string>('database.uriProd')
             : cfg.get<string>('database.uriDev'),
-        // you can also supply dbName, useNewUrlParser, etc.
       }),
     }),
     UsersModule,
     AuthModule,
     KycModule,
-    ListingsModule
+    ListingsModule,
+    OrdersModule,
+    EscrowModule,
+    CommissionsModule
   ],
 })
 export class AppModule {}
