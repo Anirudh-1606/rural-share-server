@@ -1,15 +1,34 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UsersModule } from './modules/users/users.module';
-// … import other feature modules
+import { AuthModule } from './modules/auth/auth.module'
+import databaseConfig from './config/database.config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { User } from './modules/users/users.schema';
 
 @Module({
   imports: [
-    MongooseModule.forRoot(process.env.MONGO_URI, {
-      // useCreateIndex etc. if needed
+    ConfigModule.forRoot({ 
+      isGlobal: true, 
+      envFilePath: [
+        // `.env.${process.env.NODE_ENV || 'development'}`,
+        '.env' 
+      ],
+      load: [databaseConfig],
+    }),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (cfg: ConfigService) => ({
+        uri: 
+          (process.env.NODE_ENV === 'production')
+            ? cfg.get<string>('database.uriProd')
+            : cfg.get<string>('database.uriDev'),
+        // you can also supply dbName, useNewUrlParser, etc.
+      }),
     }),
     UsersModule,
-    // … ListingsModule, OrdersModule, etc.
+    AuthModule,
   ],
 })
 export class AppModule {}

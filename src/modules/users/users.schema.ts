@@ -21,7 +21,7 @@ export class User {
   @Prop({ default: false })
   isVerified: boolean;
 
-  @Prop({ default: 'none', enum: ['none','pending','approved','rejected'] })
+  @Prop({ default: 'pending', enum: ['none','pending','approved','rejected'] })
   kycStatus: string;
 }
 
