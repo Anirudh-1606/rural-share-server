@@ -6,6 +6,7 @@ import { KycModule } from './modules/kyc/kyc.module';
 import { ListingsModule } from './modules/listings/listings.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { EscrowModule } from './modules/escrow/escrow.module';
+import { RatingsModule } from './modules/ratings/ratings.module';
 import { CommissionsModule } from './modules/commissions/commissions.module';
 import databaseConfig from './config/database.config';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -35,7 +36,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     ListingsModule,
     OrdersModule,
     EscrowModule,
-    CommissionsModule
+    CommissionsModule,
+    RatingsModule
   ],
 })
 export class AppModule {}
