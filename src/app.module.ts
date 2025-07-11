@@ -2,10 +2,9 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module'
+import { KycModule } from './modules/kyc/kyc.module';
 import databaseConfig from './config/database.config';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { User } from './modules/users/users.schema';
-
 @Module({
   imports: [
     ConfigModule.forRoot({ 
@@ -29,6 +28,7 @@ import { User } from './modules/users/users.schema';
     }),
     UsersModule,
     AuthModule,
+    KycModule
   ],
 })
 export class AppModule {}
