@@ -17,13 +17,32 @@ export class OrdersController {
     return this.svc.findAll();
   }
 
+  @Get('seeker/:seekerId')
+  findBySeeker(@Param('seekerId') seekerId: string) {
+    return this.svc.findBySeeker(seekerId);
+  }
+
+  @Get('provider/:providerId')
+  findByProvider(@Param('providerId') providerId: string) {
+    return this.svc.findByProvider(providerId);
+  }
+
+   @Get('provider/:providerId/summary')
+  getProviderSummary(@Param('providerId') providerId: string) {
+    return this.svc.getProviderSummary(providerId);
+  }
+
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.svc.findById(id);
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderStatusDto,
+  ) {
     return this.svc.updateStatus(id, dto);
   }
 }
