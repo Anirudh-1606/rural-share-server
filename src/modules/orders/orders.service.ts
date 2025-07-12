@@ -10,10 +10,7 @@ export class OrdersService {
   constructor(@InjectModel(Order.name) private orderModel: Model<OrderDocument>) {}
 
   async create(dto: CreateOrderDto): Promise<Order> {
-    const order = new this.orderModel({
-      ...dto,
-      createdAt: new Date(),
-    });
+    const order = new this.orderModel({ ...dto, createdAt: new Date() });
     return order.save();
   }
 
@@ -25,6 +22,14 @@ export class OrdersService {
     const order = await this.orderModel.findById(id).exec();
     if (!order) throw new NotFoundException('Order not found');
     return order;
+  }
+
+  async findBySeeker(seekerId: string): Promise<Order[]> {
+    return this.orderModel.find({ seekerId }).exec();
+  }
+
+  async findByProvider(providerId: string): Promise<Order[]> {
+    return this.orderModel.find({ providerId }).exec();
   }
 
   async updateStatus(id: string, dto: UpdateOrderStatusDto): Promise<Order> {
