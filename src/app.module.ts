@@ -1,3 +1,4 @@
+// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -12,6 +13,7 @@ import { CommissionsModule } from './modules/commissions/commissions.module';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { CatalogueModule } from './modules/catalogue/catalogue.module';
 import { ProvidersModule } from './modules/providers/providers.module';
+import { ChatModule } from './modules/chat/chat.module';
 import databaseConfig from './config/database.config';
 
 @Module({
@@ -41,7 +43,8 @@ import databaseConfig from './config/database.config';
     RatingsModule,
     AddressesModule,
     CatalogueModule,
-    ProvidersModule
+    ProvidersModule,
+    ChatModule
   ],
 })
 export class AppModule {}
