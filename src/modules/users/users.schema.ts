@@ -1,8 +1,25 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
 export type UserDocument = User & Document;
+
+@Schema({ _id: false })
+export class UserPreferences {
+  @Prop({ type: String, default: 'provider', enum: ['provider', 'seeker'] })
+  defaultLandingPage: string;
+
+  @Prop({ type: String, default: 'active' })
+  defaultProviderTab: string; // 'active', 'completed', 'review'
+
+  @Prop({ type: String })
+  preferredLanguage: string;
+
+  @Prop({ type: Boolean, default: true })
+  notificationsEnabled: boolean;
+}
+
+const UserPreferencesSchema = SchemaFactory.createForClass(UserPreferences);
 
 @Schema({ timestamps: true })
 export class User {
@@ -15,14 +32,23 @@ export class User {
   @Prop({ type: String, required: true })
   password: string;
 
+  @Prop({ type: String, required: true })
+  phone: string;
+
   @Prop({ type: String, required: true, enum: ['individual','SHG','FPO','admin'] })
   role: string;
 
   @Prop({ default: false })
   isVerified: boolean;
 
-  @Prop({ default: 'pending', enum: ['none','pending','approved','rejected'] })
+  @Prop({ default: 'none', enum: ['none','pending','approved','rejected'] })
   kycStatus: string;
+
+  @Prop({ type: UserPreferencesSchema, default: () => ({}) })
+  preferences: UserPreferences;
+
+  @Prop({ type: Types.ObjectId, ref: 'Address' })
+  defaultAddressId: Types.ObjectId;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

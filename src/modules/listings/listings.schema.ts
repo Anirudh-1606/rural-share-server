@@ -14,11 +14,11 @@ export class Listing {
   @Prop({ type: String, required: true })
   description: string;
 
-  @Prop({ type: String, required: true })
-  category: string;
+  @Prop({ type: Types.ObjectId, ref: 'Catalogue', required: true })
+  categoryId: Types.ObjectId; // Reference to catalogue instead of string
 
-  @Prop({ type: String, required: true })
-  subCategory: string;
+  @Prop({ type: Types.ObjectId, ref: 'Catalogue', required: true })
+  subCategoryId: Types.ObjectId; // Reference to catalogue instead of string
 
   @Prop({ type: [String], default: [] })
   photos: string[];
@@ -39,7 +39,12 @@ export class Listing {
 
   @Prop({ type: Date })
   availableTo: Date;
+
+  @Prop({ type: Boolean, default: true })
+  isActive: boolean;
 }
 
 export const ListingSchema = SchemaFactory.createForClass(Listing);
 ListingSchema.index({ coordinates: '2dsphere' });
+ListingSchema.index({ providerId: 1 });
+ListingSchema.index({ categoryId: 1, subCategoryId: 1 });
