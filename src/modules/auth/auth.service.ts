@@ -1,8 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from '../users/dto/create-user.dto';
+import { OtpLoginDto } from './dto/otp-login.dto';
 
 @Injectable()
 export class AuthService {
@@ -31,5 +32,57 @@ export class AuthService {
     const user = await this.usersService.create(createDto);
     const { password, ...result } = user.toObject();
     return result;
+  }
+
+  async otpLogin(otpLoginDto: OtpLoginDto) {
+    const { phone } = otpLoginDto;
+
+    // 1. Validate input (already done by DTO validation)
+    if (!phone || !/^\d{10,15}$/.test(phone)) {
+      throw new BadRequestException('Valid phone number is required');
+    }
+
+    // 2. Check if phone number exists BEFORE proceeding (as requested)
+    const user = await this.usersService.findByPhone(phone);
+    if (!user) {
+      console.log(`Phone number ${phone} not found in database`);
+      throw new NotFoundException('Phone number not registered');
+    }
+
+    console.log(`Phone number ${phone} found for user: ${user.email}`);
+
+    // 3. Mark user as verified (if not already)
+    if (!user.isVerified) {
+      user.isVerified = true;
+      await user.save();
+      console.log(`User ${user.email} marked as verified`);
+    }
+
+    // 4. Generate JWT token (matching the specification exactly)
+    const payload = {
+      id: user._id,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+    };
+
+    const token = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+    // 5. Return success response (matching the specification exactly)
+    return {
+      message: 'OTP login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        isVerified: user.isVerified,
+        kycStatus: user.kycStatus,
+        createdAt: (user as any).createdAt,
+        updatedAt: (user as any).updatedAt,
+      },
+    };
   }
 }
