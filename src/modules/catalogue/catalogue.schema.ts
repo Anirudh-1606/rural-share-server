@@ -58,6 +58,8 @@ export class Catalogue {
 
   @Prop({ type: Number })
   suggestedMaxPrice?: number;
+    private _id: any;
+    id: any;
 }
 
 export const CatalogueSchema = SchemaFactory.createForClass(Catalogue);

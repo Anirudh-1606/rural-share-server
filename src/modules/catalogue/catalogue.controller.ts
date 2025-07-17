@@ -13,13 +13,13 @@ export class CatalogueController {
   }
 
   @Get()
-  findAll(@Query('type') type?: string) {
-    return this.catalogueService.findAll(type);
+  findAll(@Query('category') category?: string) {
+    return this.catalogueService.findAll(category);
   }
 
   @Get('categories')
-  findCategories(@Query('type') type?: string) {
-    return this.catalogueService.findCategories(type);
+  findCategories(@Query('category') category?: string) {
+    return this.catalogueService.findCategories(category);
   }
 
   @Get('hierarchy')

@@ -1,0 +1,268 @@
+<svg viewBox="0 0 1400 1600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Title -->
+  <text x="700" y="40" text-anchor="middle" font-size="28" font-weight="bold" fill="#2c3e50">
+    Rural-Share Backend Architecture
+  </text>
+  
+  <!-- Client Layer -->
+  <g id="client-layer">
+    <rect x="50" y="80" width="1300" height="120" fill="#e8f4f8" stroke="#3498db" stroke-width="2" rx="10"/>
+    <text x="70" y="110" font-size="18" font-weight="bold" fill="#2c3e50">Client Layer</text>
+    
+    <!-- Client boxes -->
+    <rect x="150" y="130" width="200" height="50" fill="#3498db" stroke="#2980b9" stroke-width="2" rx="5"/>
+    <text x="250" y="160" text-anchor="middle" fill="white" font-size="14">Mobile App (Android)</text>
+    
+    <rect x="400" y="130" width="200" height="50" fill="#3498db" stroke="#2980b9" stroke-width="2" rx="5"/>
+    <text x="500" y="160" text-anchor="middle" fill="white" font-size="14">Web Admin Console</text>
+    
+    <rect x="650" y="130" width="200" height="50" fill="#3498db" stroke="#2980b9" stroke-width="2" rx="5"/>
+    <text x="750" y="160" text-anchor="middle" fill="white" font-size="14">WebSocket Clients</text>
+  </g>
+  
+  <!-- API Gateway Layer -->
+  <g id="gateway-layer">
+    <rect x="50" y="230" width="1300" height="100" fill="#f0f0f0" stroke="#7f8c8d" stroke-width="2" rx="10"/>
+    <text x="70" y="260" font-size="18" font-weight="bold" fill="#2c3e50">API Gateway</text>
+    
+    <rect x="300" y="260" width="800" height="50" fill="#95a5a6" stroke="#7f8c8d" stroke-width="2" rx="5"/>
+    <text x="700" y="290" text-anchor="middle" fill="white" font-size="14">NestJS Application (Port 3000)</text>
+  </g>
+  
+  <!-- Authentication Layer -->
+  <g id="auth-layer">
+    <rect x="50" y="360" width="1300" height="80" fill="#fef5e7" stroke="#f39c12" stroke-width="2" rx="10"/>
+    <text x="70" y="390" font-size="18" font-weight="bold" fill="#2c3e50">Authentication & Authorization</text>
+    
+    <rect x="200" y="390" width="150" height="40" fill="#f39c12" stroke="#e67e22" stroke-width="2" rx="5"/>
+    <text x="275" y="415" text-anchor="middle" fill="white" font-size="12">JWT Strategy</text>
+    
+    <rect x="400" y="390" width="150" height="40" fill="#f39c12" stroke="#e67e22" stroke-width="2" rx="5"/>
+    <text x="475" y="415" text-anchor="middle" fill="white" font-size="12">Auth Guards</text>
+    
+    <rect x="600" y="390" width="150" height="40" fill="#f39c12" stroke="#e67e22" stroke-width="2" rx="5"/>
+    <text x="675" y="415" text-anchor="middle" fill="white" font-size="12">Role Guards</text>
+    
+    <rect x="800" y="390" width="150" height="40" fill="#f39c12" stroke="#e67e22" stroke-width="2" rx="5"/>
+    <text x="875" y="415" text-anchor="middle" fill="white" font-size="12">WS JWT Guard</text>
+  </g>
+  
+  <!-- Core Modules Layer -->
+  <g id="modules-layer">
+    <rect x="50" y="470" width="1300" height="580" fill="#e8f8f5" stroke="#16a085" stroke-width="2" rx="10"/>
+    <text x="70" y="500" font-size="18" font-weight="bold" fill="#2c3e50">Core Business Modules</text>
+    
+    <!-- Row 1 -->
+    <g id="row1">
+      <!-- Users Module -->
+      <rect x="100" y="520" width="180" height="120" fill="#27ae60" stroke="#229954" stroke-width="2" rx="5"/>
+      <text x="190" y="545" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Users Module</text>
+      <text x="190" y="565" text-anchor="middle" fill="white" font-size="11">• User Schema</text>
+      <text x="190" y="580" text-anchor="middle" fill="white" font-size="11">• Preferences</text>
+      <text x="190" y="595" text-anchor="middle" fill="white" font-size="11">• Profile Mgmt</text>
+      <text x="190" y="610" text-anchor="middle" fill="white" font-size="11">• KYC Status</text>
+      
+      <!-- Auth Module -->
+      <rect x="300" y="520" width="180" height="120" fill="#e74c3c" stroke="#c0392b" stroke-width="2" rx="5"/>
+      <text x="390" y="545" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Auth Module</text>
+      <text x="390" y="565" text-anchor="middle" fill="white" font-size="11">• Registration</text>
+      <text x="390" y="580" text-anchor="middle" fill="white" font-size="11">• Login/Logout</text>
+      <text x="390" y="595" text-anchor="middle" fill="white" font-size="11">• JWT Tokens</text>
+      <text x="390" y="610" text-anchor="middle" fill="white" font-size="11">• OTP Verify</text>
+      
+      <!-- KYC Module -->
+      <rect x="500" y="520" width="180" height="120" fill="#9b59b6" stroke="#8e44ad" stroke-width="2" rx="5"/>
+      <text x="590" y="545" text-anchor="middle" fill="white" font-size="14" font-weight="bold">KYC Module</text>
+      <text x="590" y="565" text-anchor="middle" fill="white" font-size="11">• Document Upload</text>
+      <text x="590" y="580" text-anchor="middle" fill="white" font-size="11">• Verification</text>
+      <text x="590" y="595" text-anchor="middle" fill="white" font-size="11">• Status Tracking</text>
+      <text x="590" y="610" text-anchor="middle" fill="white" font-size="11">• Admin Review</text>
+      
+      <!-- Addresses Module -->
+      <rect x="700" y="520" width="180" height="120" fill="#34495e" stroke="#2c3e50" stroke-width="2" rx="5"/>
+      <text x="790" y="545" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Addresses Module</text>
+      <text x="790" y="565" text-anchor="middle" fill="white" font-size="11">• Address CRUD</text>
+      <text x="790" y="580" text-anchor="middle" fill="white" font-size="11">• Geo-location</text>
+      <text x="790" y="595" text-anchor="middle" fill="white" font-size="11">• Default Address</text>
+      <text x="790" y="610" text-anchor="middle" fill="white" font-size="11">• 2D Indexing</text>
+      
+      <!-- Catalogue Module -->
+      <rect x="900" y="520" width="180" height="120" fill="#16a085" stroke="#138d75" stroke-width="2" rx="5"/>
+      <text x="990" y="545" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Catalogue Module</text>
+      <text x="990" y="565" text-anchor="middle" fill="white" font-size="11">• 4 Main Categories</text>
+      <text x="990" y="580" text-anchor="middle" fill="white" font-size="11">• Subcategories</text>
+      <text x="990" y="595" text-anchor="middle" fill="white" font-size="11">• Transaction Types</text>
+      <text x="990" y="610" text-anchor="middle" fill="white" font-size="11">• Units of Measure</text>
+      
+      <!-- Messages Module -->
+      <rect x="1100" y="520" width="180" height="120" fill="#d35400" stroke="#ba4a00" stroke-width="2" rx="5"/>
+      <text x="1190" y="545" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Messages Module</text>
+      <text x="1190" y="565" text-anchor="middle" fill="white" font-size="11">• Notifications</text>
+      <text x="1190" y="580" text-anchor="middle" fill="white" font-size="11">• Broadcasts</text>
+      <text x="1190" y="595" text-anchor="middle" fill="white" font-size="11">• System Alerts</text>
+      <text x="1190" y="610" text-anchor="middle" fill="white" font-size="11">• Read Tracking</text>
+    </g>
+    
+    <!-- Row 2 -->
+    <g id="row2">
+      <!-- Listings Module -->
+      <rect x="100" y="660" width="180" height="120" fill="#3498db" stroke="#2980b9" stroke-width="2" rx="5"/>
+      <text x="190" y="685" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Listings Module</text>
+      <text x="190" y="705" text-anchor="middle" fill="white" font-size="11">• Resource Listing</text>
+      <text x="190" y="720" text-anchor="middle" fill="white" font-size="11">• Availability Cal</text>
+      <text x="190" y="735" text-anchor="middle" fill="white" font-size="11">• Geo Search</text>
+      <text x="190" y="750" text-anchor="middle" fill="white" font-size="11">• Price/Unit</text>
+      
+      <!-- Orders Module -->
+      <rect x="300" y="660" width="180" height="120" fill="#e67e22" stroke="#ca6f1e" stroke-width="2" rx="5"/>
+      <text x="390" y="685" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Orders Module</text>
+      <text x="390" y="705" text-anchor="middle" fill="white" font-size="11">• Booking Requests</text>
+      <text x="390" y="720" text-anchor="middle" fill="white" font-size="11">• Auto-rejection</text>
+      <text x="390" y="735" text-anchor="middle" fill="white" font-size="11">• Status Flow</text>
+      <text x="390" y="750" text-anchor="middle" fill="white" font-size="11">• Cron Jobs</text>
+      
+      <!-- Escrow Module -->
+      <rect x="500" y="660" width="180" height="120" fill="#1abc9c" stroke="#17a589" stroke-width="2" rx="5"/>
+      <text x="590" y="685" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Escrow Module</text>
+      <text x="590" y="705" text-anchor="middle" fill="white" font-size="11">• Payment Hold</text>
+      <text x="590" y="720" text-anchor="middle" fill="white" font-size="11">• Release/Refund</text>
+      <text x="590" y="735" text-anchor="middle" fill="white" font-size="11">• Partial Refund</text>
+      <text x="590" y="750" text-anchor="middle" fill="white" font-size="11">• Dispute Status</text>
+      
+      <!-- Commissions Module -->
+      <rect x="700" y="660" width="180" height="120" fill="#f39c12" stroke="#d68910" stroke-width="2" rx="5"/>
+      <text x="790" y="685" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Commissions Module</text>
+      <text x="790" y="705" text-anchor="middle" fill="white" font-size="11">• Rate Calculation</text>
+      <text x="790" y="720" text-anchor="middle" fill="white" font-size="11">• Payment Track</text>
+      <text x="790" y="735" text-anchor="middle" fill="white" font-size="11">• Provider Earnings</text>
+      <text x="790" y="750" text-anchor="middle" fill="white" font-size="11">• Platform Revenue</text>
+      
+      <!-- Disputes Module -->
+      <rect x="900" y="660" width="180" height="120" fill="#c0392b" stroke="#a93226" stroke-width="2" rx="5"/>
+      <text x="990" y="685" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Disputes Module</text>
+      <text x="990" y="705" text-anchor="middle" fill="white" font-size="11">• Raise Dispute</text>
+      <text x="990" y="720" text-anchor="middle" fill="white" font-size="11">• Evidence Upload</text>
+      <text x="990" y="735" text-anchor="middle" fill="white" font-size="11">• Admin Resolution</text>
+      <text x="990" y="750" text-anchor="middle" fill="white" font-size="11">• Message Thread</text>
+      
+      <!-- Ratings Module -->
+      <rect x="1100" y="660" width="180" height="120" fill="#8e44ad" stroke="#7d3c98" stroke-width="2" rx="5"/>
+      <text x="1190" y="685" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Ratings Module</text>
+      <text x="1190" y="705" text-anchor="middle" fill="white" font-size="11">• Two-way Rating</text>
+      <text x="1190" y="720" text-anchor="middle" fill="white" font-size="11">• Reviews</text>
+      <text x="1190" y="735" text-anchor="middle" fill="white" font-size="11">• Score Tracking</text>
+      <text x="1190" y="750" text-anchor="middle" fill="white" font-size="11">• Trust Building</text>
+    </g>
+    
+    <!-- Row 3 -->
+    <g id="row3">
+      <!-- Chat Module -->
+      <rect x="400" y="800" width="200" height="120" fill="#2c3e50" stroke="#1a252f" stroke-width="2" rx="5"/>
+      <text x="500" y="825" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Chat Module</text>
+      <text x="500" y="845" text-anchor="middle" fill="white" font-size="11">• Real-time Messaging</text>
+      <text x="500" y="860" text-anchor="middle" fill="white" font-size="11">• Conversations</text>
+      <text x="500" y="875" text-anchor="middle" fill="white" font-size="11">• WebSocket Gateway</text>
+      <text x="500" y="890" text-anchor="middle" fill="white" font-size="11">• Read Receipts</text>
+      <text x="500" y="905" text-anchor="middle" fill="white" font-size="11">• Online Status</text>
+      
+      <!-- Providers Module -->
+      <rect x="650" y="800" width="200" height="120" fill="#27ae60" stroke="#229954" stroke-width="2" rx="5"/>
+      <text x="750" y="825" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Providers Module</text>
+      <text x="750" y="845" text-anchor="middle" fill="white" font-size="11">• Dashboard Analytics</text>
+      <text x="750" y="860" text-anchor="middle" fill="white" font-size="11">• Booking Management</text>
+      <text x="750" y="875" text-anchor="middle" fill="white" font-size="11">• Revenue Tracking</text>
+      <text x="750" y="890" text-anchor="middle" fill="white" font-size="11">• Performance Stats</text>
+      <text x="750" y="905" text-anchor="middle" fill="white" font-size="11">• Review Reminders</text>
+    </g>
+  </g>
+  
+  <!-- Infrastructure Layer -->
+  <g id="infra-layer">
+    <rect x="50" y="1080" width="1300" height="180" fill="#fdebd0" stroke="#d68910" stroke-width="2" rx="10"/>
+    <text x="70" y="1110" font-size="18" font-weight="bold" fill="#2c3e50">Infrastructure Services</text>
+    
+    <!-- Services -->
+    <rect x="150" y="1130" width="180" height="100" fill="#e67e22" stroke="#ca6f1e" stroke-width="2" rx="5"/>
+    <text x="240" y="1155" text-anchor="middle" fill="white" font-size="13" font-weight="bold">MongoDB</text>
+    <text x="240" y="1175" text-anchor="middle" fill="white" font-size="11">• Mongoose ODM</text>
+    <text x="240" y="1190" text-anchor="middle" fill="white" font-size="11">• 2D Indexes</text>
+    <text x="240" y="1205" text-anchor="middle" fill="white" font-size="11">• Text Search</text>
+    <text x="240" y="1220" text-anchor="middle" fill="white" font-size="11">• Aggregations</text>
+    
+    <rect x="380" y="1130" width="180" height="100" fill="#3498db" stroke="#2980b9" stroke-width="2" rx="5"/>
+    <text x="470" y="1155" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Scheduler</text>
+    <text x="470" y="1175" text-anchor="middle" fill="white" font-size="11">• NestJS Schedule</text>
+    <text x="470" y="1190" text-anchor="middle" fill="white" font-size="11">• Cron Jobs</text>
+    <text x="470" y="1205" text-anchor="middle" fill="white" font-size="11">• Auto-rejection</text>
+    <text x="470" y="1220" text-anchor="middle" fill="white" font-size="11">• Cleanup Tasks</text>
+    
+    <rect x="610" y="1130" width="180" height="100" fill="#16a085" stroke="#138d75" stroke-width="2" rx="5"/>
+    <text x="700" y="1155" text-anchor="middle" fill="white" font-size="13" font-weight="bold">WebSocket</text>
+    <text x="700" y="1175" text-anchor="middle" fill="white" font-size="11">• Socket.io</text>
+    <text x="700" y="1190" text-anchor="middle" fill="white" font-size="11">• Real-time Events</text>
+    <text x="700" y="1205" text-anchor="middle" fill="white" font-size="11">• Chat Gateway</text>
+    <text x="700" y="1220" text-anchor="middle" fill="white" font-size="11">• Status Updates</text>
+    
+    <rect x="840" y="1130" width="180" height="100" fill="#9b59b6" stroke="#8e44ad" stroke-width="2" rx="5"/>
+    <text x="930" y="1155" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Config Service</text>
+    <text x="930" y="1175" text-anchor="middle" fill="white" font-size="11">• Environment Vars</text>
+    <text x="930" y="1190" text-anchor="middle" fill="white" font-size="11">• Database Config</text>
+    <text x="930" y="1205" text-anchor="middle" fill="white" font-size="11">• JWT Secrets</text>
+    <text x="930" y="1220" text-anchor="middle" fill="white" font-size="11">• API Keys</text>
+    
+    <rect x="1070" y="1130" width="180" height="100" fill="#e74c3c" stroke="#c0392b" stroke-width="2" rx="5"/>
+    <text x="1160" y="1155" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Validators</text>
+    <text x="1160" y="1175" text-anchor="middle" fill="white" font-size="11">• Class Validator</text>
+    <text x="1160" y="1190" text-anchor="middle" fill="white" font-size="11">• DTOs</text>
+    <text x="1160" y="1205" text-anchor="middle" fill="white" font-size="11">• Type Safety</text>
+    <text x="1160" y="1220" text-anchor="middle" fill="white" font-size="11">• Request Validation</text>
+  </g>
+  
+  <!-- External Services -->
+  <g id="external-layer">
+    <rect x="50" y="1290" width="1300" height="120" fill="#ebf5fb" stroke="#5dade2" stroke-width="2" rx="10"/>
+    <text x="70" y="1320" font-size="18" font-weight="bold" fill="#2c3e50">External Services (Planned)</text>
+    
+    <rect x="200" y="1340" width="150" height="50" fill="#5dade2" stroke="#3498db" stroke-width="2" rx="5"/>
+    <text x="275" y="1370" text-anchor="middle" fill="white" font-size="12">UPI Gateway</text>
+    
+    <rect x="400" y="1340" width="150" height="50" fill="#5dade2" stroke="#3498db" stroke-width="2" rx="5"/>
+    <text x="475" y="1370" text-anchor="middle" fill="white" font-size="12">SMS/OTP Service</text>
+    
+    <rect x="600" y="1340" width="150" height="50" fill="#5dade2" stroke="#3498db" stroke-width="2" rx="5"/>
+    <text x="675" y="1370" text-anchor="middle" fill="white" font-size="12">Google Maps API</text>
+    
+    <rect x="800" y="1340" width="150" height="50" fill="#5dade2" stroke="#3498db" stroke-width="2" rx="5"/>
+    <text x="875" y="1370" text-anchor="middle" fill="white" font-size="12">Push Notifications</text>
+    
+    <rect x="1000" y="1340" width="150" height="50" fill="#5dade2" stroke="#3498db" stroke-width="2" rx="5"/>
+    <text x="1075" y="1370" text-anchor="middle" fill="white" font-size="12">File Storage</text>
+  </g>
+  
+  <!-- Key Features -->
+  <g id="features">
+    <rect x="50" y="1440" width="1300" height="130" fill="#f4f6f7" stroke="#7f8c8d" stroke-width="2" rx="10"/>
+    <text x="70" y="1470" font-size="18" font-weight="bold" fill="#2c3e50">Key Architectural Features</text>
+    
+    <text x="100" y="1500" font-size="14" fill="#2c3e50">• Modular Architecture: Each module is self-contained with its own schema, service, controller, and DTOs</text>
+    <text x="100" y="1520" font-size="14" fill="#2c3e50">• Event-Driven: WebSocket integration for real-time updates and chat functionality</text>
+    <text x="100" y="1540" font-size="14" fill="#2c3e50">• Geo-Spatial: MongoDB 2D indexing for location-based resource discovery</text>
+    <text x="700" y="1500" font-size="14" fill="#2c3e50">• Secure: JWT-based authentication with role-based access control</text>
+    <text x="700" y="1520" font-size="14" fill="#2c3e50">• Scalable: Stateless architecture ready for horizontal scaling</text>
+    <text x="700" y="1540" font-size="14" fill="#2c3e50">• Automated: Cron jobs for auto-rejection and cleanup tasks</text>
+  </g>
+  
+  <!-- Draw connections -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7f8c8d"/>
+    </marker>
+  </defs>
+  
+  <!-- Connection lines -->
+  <line x1="700" y1="200" x2="700" y2="230" stroke="#7f8c8d" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="700" y1="330" x2="700" y2="360" stroke="#7f8c8d" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="700" y1="440" x2="700" y2="470" stroke="#7f8c8d" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="700" y1="1050" x2="700" y2="1080" stroke="#7f8c8d" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="700" y1="1260" x2="700" y2="1290" stroke="#7f8c8d" stroke-width="2" marker-end="url(#arrowhead)"/>
+</svg>
