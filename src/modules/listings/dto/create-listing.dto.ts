@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsMongoId, IsArray, ArrayNotEmpty, ArrayMinSize, IsNumber, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsMongoId, IsArray, ArrayNotEmpty, ArrayMinSize, IsNumber, IsDateString, IsBoolean, IsOptional } from 'class-validator';
 
 export class CreateListingDto {
   @IsMongoId()
@@ -12,13 +12,11 @@ export class CreateListingDto {
   @IsNotEmpty()
   description: string;
 
-  @IsString()
-  @IsNotEmpty()
-  category: string;
+  @IsMongoId()
+  categoryId: string;
 
-  @IsString()
-  @IsNotEmpty()
-  subCategory: string;
+  @IsMongoId()
+  subCategoryId: string;
 
   @IsArray()
   @ArrayNotEmpty()
@@ -39,4 +37,8 @@ export class CreateListingDto {
 
   @IsDateString()
   availableTo: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }

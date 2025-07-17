@@ -1,4 +1,4 @@
-import { IsString, IsEmail, MinLength, IsIn, Matches } from 'class-validator';
+import { IsString, IsEmail, MinLength, IsIn, Matches, IsPhoneNumber } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
@@ -8,12 +8,16 @@ export class CreateUserDto {
   email: string;
 
   @IsString()
+  @IsPhoneNumber('IN')
   @Matches(/^\d{10,15}$/, { message: 'Valid phone number is required' })
   phone: string;
 
   @IsString()
   @MinLength(6)
   password: string;
+
+  
+  
 
   @IsString()
   @IsIn(['individual', 'SHG', 'FPO', 'admin'])

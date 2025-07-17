@@ -16,6 +16,6 @@ import { AvailabilitiesController } from './availabilities.controller';
   ],
   providers: [ListingsService, AvailabilitiesService],
   controllers: [ListingsController, AvailabilitiesController],
-  exports: [],
+  exports: [ListingsService], // ADD THIS LINE!
 })
 export class ListingsModule {}
