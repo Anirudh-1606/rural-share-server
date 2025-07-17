@@ -15,24 +15,42 @@ export class Listing {
   description: string;
 
   @Prop({ type: Types.ObjectId, ref: 'Catalogue', required: true })
-  categoryId: Types.ObjectId; // Reference to catalogue instead of string
+  categoryId: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'Catalogue', required: true })
-  subCategoryId: Types.ObjectId; // Reference to catalogue instead of string
+  subCategoryId: Types.ObjectId;
 
   @Prop({ type: [String], default: [] })
   photos: string[];
 
-  @Prop({
-    type: { type: String, enum: ['Point'], default: 'Point' },
-  })
-  locationType: string;
+  @Prop({ type: String })
+  videoUrl?: string; // For video demonstrations
 
-  @Prop({ type: [Number], required: true })
-  coordinates: number[];
+  @Prop({
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point',
+      required: true
+    },
+    coordinates: {
+      type: [Number],
+      required: true
+    }
+  })
+  location: {
+    type: string;
+    coordinates: number[];
+  };
 
   @Prop({ type: Number, required: true })
   price: number;
+
+  @Prop({ type: String, required: true, enum: ['per_hour', 'per_day', 'per_piece', 'per_kg', 'per_unit'] })
+  unitOfMeasure: string;
+
+  @Prop({ type: Number })
+  minimumOrder?: number; // Minimum quantity/duration
 
   @Prop({ type: Date })
   availableFrom: Date;
@@ -42,9 +60,26 @@ export class Listing {
 
   @Prop({ type: Boolean, default: true })
   isActive: boolean;
+
+  @Prop({ type: Number, default: 0 })
+  viewCount: number;
+
+  @Prop({ type: Number, default: 0 })
+  bookingCount: number;
+
+  @Prop({ type: [String], default: [] })
+  tags: string[]; // For better search
+
+  @Prop({ type: String })
+  termsAndConditions?: string;
+
+  @Prop({ type: Boolean, default: false })
+  isVerified: boolean; // Admin verified listing
 }
 
 export const ListingSchema = SchemaFactory.createForClass(Listing);
-ListingSchema.index({ coordinates: '2dsphere' });
-ListingSchema.index({ providerId: 1 });
-ListingSchema.index({ categoryId: 1, subCategoryId: 1 });
+ListingSchema.index({ location: '2dsphere' });
+ListingSchema.index({ providerId: 1, isActive: 1 });
+ListingSchema.index({ categoryId: 1, subCategoryId: 1, isActive: 1 });
+ListingSchema.index({ tags: 1 });
+ListingSchema.index({ title: 'text', description: 'text' });

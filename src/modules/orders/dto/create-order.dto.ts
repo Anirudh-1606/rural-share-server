@@ -1,4 +1,5 @@
-import { IsMongoId, IsEnum, IsDateString, IsNumber, ArrayMinSize, IsArray, IsOptional } from 'class-validator';
+import { IsMongoId, IsEnum, IsDateString, IsNumber, ArrayMinSize, IsArray, IsOptional, IsString } from 'class-validator';
+import { OrderType } from '../orders.schema';
 
 export enum OrderStatus {
   PENDING = 'pending',
@@ -18,14 +19,27 @@ export class CreateOrderDto {
   @IsMongoId()
   providerId: string;
 
-  @IsEnum(OrderStatus)
-  status: OrderStatus;
-
-  @IsDateString()
-  expiresAt: string;
+  @IsEnum(OrderType)
+  orderType: OrderType;
 
   @IsNumber()
   totalAmount: number;
+
+  @IsDateString()
+  @IsOptional()
+  serviceStartDate?: string;
+
+  @IsDateString()
+  @IsOptional()
+  serviceEndDate?: string;
+
+  @IsNumber()
+  @IsOptional()
+  quantity?: number;
+
+  @IsString()
+  @IsOptional()
+  unitOfMeasure?: string;
 
   @IsArray()
   @ArrayMinSize(2)
