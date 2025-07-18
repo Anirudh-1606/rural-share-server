@@ -1,9 +1,5 @@
 import { IsString, IsNotEmpty, IsEnum, IsOptional, IsMongoId, IsBoolean, IsNumber } from 'class-validator';
-
-export enum CatalogueType {
-  HUMAN = 'human',
-  MECHANICAL = 'mechanical'
-}
+import { ResourceCategory, TransactionType, UnitOfMeasure } from '../catalogue.schema';
 
 export class CreateCatalogueDto {
   @IsString()
@@ -14,8 +10,11 @@ export class CreateCatalogueDto {
   @IsNotEmpty()
   description: string;
 
-  @IsEnum(CatalogueType)
-  type: CatalogueType;
+  @IsEnum(ResourceCategory)
+  category: ResourceCategory;
+
+  @IsEnum(TransactionType)
+  transactionType: TransactionType;
 
   @IsMongoId()
   @IsOptional()
@@ -32,4 +31,16 @@ export class CreateCatalogueDto {
   @IsNumber()
   @IsOptional()
   sortOrder?: number;
+
+  @IsEnum(UnitOfMeasure)
+  @IsOptional()
+  defaultUnitOfMeasure?: UnitOfMeasure;
+
+  @IsNumber()
+  @IsOptional()
+  suggestedMinPrice?: number;
+
+  @IsNumber()
+  @IsOptional()
+  suggestedMaxPrice?: number;
 }

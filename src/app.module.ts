@@ -1,7 +1,7 @@
-// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { KycModule } from './modules/kyc/kyc.module';
@@ -14,6 +14,8 @@ import { AddressesModule } from './modules/addresses/addresses.module';
 import { CatalogueModule } from './modules/catalogue/catalogue.module';
 import { ProvidersModule } from './modules/providers/providers.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { MessagesModule } from './modules/messages/messages.module';
+import { DisputesModule } from './modules/disputes/disputes.module';
 import databaseConfig from './config/database.config';
 
 @Module({
@@ -33,6 +35,7 @@ import databaseConfig from './config/database.config';
             : cfg.get<string>('database.uriDev'),
       }),
     }),
+    ScheduleModule.forRoot(), // For cron jobs
     UsersModule,
     AuthModule,
     KycModule,
@@ -44,7 +47,9 @@ import databaseConfig from './config/database.config';
     AddressesModule,
     CatalogueModule,
     ProvidersModule,
-    ChatModule
+    ChatModule,
+    MessagesModule,
+    DisputesModule,
   ],
 })
 export class AppModule {}

@@ -1,19 +1,10 @@
-import { IsMongoId, IsNumber, IsEnum, IsOptional } from 'class-validator';
-
-export enum EscrowStatus {
-  HELD = 'held',
-  RELEASED = 'released',
-  REFUNDED = 'refunded',
-}
+import { IsMongoId, IsNumber, IsPositive } from 'class-validator';
 
 export class CreateEscrowDto {
   @IsMongoId()
   orderId: string;
 
   @IsNumber()
+  @IsPositive()
   amount: number;
-
-  @IsEnum(EscrowStatus)
-  @IsOptional()
-  status?: EscrowStatus;
 }

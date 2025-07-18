@@ -1,6 +1,7 @@
+// src/modules/catalogue/catalogue.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Catalogue, CatalogueDocument } from './catalogue.schema';
 import { CreateCatalogueDto } from './dto/create-catalogue.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
@@ -8,13 +9,13 @@ import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
 @Injectable()
 export class CatalogueService {
   constructor(
-    @InjectModel(Catalogue.name) private catalogueModel: Model<CatalogueDocument>,
+    @InjectModel(Catalogue.name) private readonly catalogueModel: Model<CatalogueDocument>,
   ) {}
 
-  async create(dto: CreateCatalogueDto): Promise<Catalogue> {
+  async create(dto: CreateCatalogueDto): Promise<CatalogueDocument> {
     // Verify parent exists if provided
     if (dto.parentId) {
-      const parent = await this.catalogueModel.findById(dto.parentId);
+      const parent = await this.catalogueModel.findById(dto.parentId).exec();
       if (!parent) throw new BadRequestException('Parent category not found');
     }
     
@@ -22,9 +23,9 @@ export class CatalogueService {
     return catalogue.save();
   }
 
-  async findAll(type?: string): Promise<Catalogue[]> {
+  async findAll(category?: string): Promise<CatalogueDocument[]> {
     const filter: any = { isActive: true };
-    if (type) filter.type = type;
+    if (category) filter.category = category;
     
     return this.catalogueModel
       .find(filter)
@@ -32,9 +33,9 @@ export class CatalogueService {
       .exec();
   }
 
-  async findCategories(type?: string): Promise<Catalogue[]> {
+  async findCategories(category?: string): Promise<CatalogueDocument[]> {
     const filter: any = { parentId: null, isActive: true };
-    if (type) filter.type = type;
+    if (category) filter.category = category;
     
     return this.catalogueModel
       .find(filter)
@@ -42,23 +43,23 @@ export class CatalogueService {
       .exec();
   }
 
-  async findSubcategories(parentId: string): Promise<Catalogue[]> {
+  async findSubcategories(parentId: string): Promise<CatalogueDocument[]> {
     return this.catalogueModel
-      .find({ parentId, isActive: true })
+      .find({ parentId: new Types.ObjectId(parentId), isActive: true })
       .sort({ sortOrder: 1, name: 1 })
       .exec();
   }
 
-  async findById(id: string): Promise<Catalogue> {
+  async findById(id: string): Promise<CatalogueDocument> {
     const catalogue = await this.catalogueModel.findById(id).exec();
     if (!catalogue) throw new NotFoundException('Catalogue item not found');
     return catalogue;
   }
 
-  async update(id: string, dto: UpdateCatalogueDto): Promise<Catalogue> {
+  async update(id: string, dto: UpdateCatalogueDto): Promise<CatalogueDocument> {
     // Verify parent exists if changing parent
     if (dto.parentId) {
-      const parent = await this.catalogueModel.findById(dto.parentId);
+      const parent = await this.catalogueModel.findById(dto.parentId).exec();
       if (!parent) throw new BadRequestException('Parent category not found');
       
       // Prevent circular reference
@@ -67,14 +68,20 @@ export class CatalogueService {
       }
     }
     
-    const updated = await this.catalogueModel.findByIdAndUpdate(id, dto, { new: true }).exec();
+    const updated = await this.catalogueModel
+      .findByIdAndUpdate(id, dto, { new: true })
+      .exec();
+      
     if (!updated) throw new NotFoundException('Catalogue item not found');
     return updated;
   }
 
-  async delete(id: string): Promise<Catalogue> {
+  async delete(id: string): Promise<CatalogueDocument> {
     // Check if has subcategories
-    const hasSubcategories = await this.catalogueModel.countDocuments({ parentId: id });
+    const hasSubcategories = await this.catalogueModel.countDocuments({ 
+      parentId: new Types.ObjectId(id) 
+    }).exec();
+    
     if (hasSubcategories > 0) {
       throw new BadRequestException('Cannot delete category with subcategories');
     }
