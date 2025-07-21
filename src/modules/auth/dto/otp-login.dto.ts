@@ -1,8 +1,12 @@
-import { IsString, IsNotEmpty, Matches } from 'class-validator';
+import { IsString, IsEmail, IsOptional, Matches } from 'class-validator';
 
 export class OtpLoginDto {
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Matches(/^\d{10,15}$/, { message: 'Valid phone number is required' })
-  phone: string;
+  phone?: string;
 } 

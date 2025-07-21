@@ -2,6 +2,7 @@ import { Controller, Post, Body, Request, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
 import { OtpLoginDto } from './dto/otp-login.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -13,8 +14,9 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(@Body() creds: { email: string; password: string }) {
-    return this.authService.login(await this.authService.validateUser(creds.email, creds.password));
+  async login(@Body() loginDto: LoginDto) {
+    const user = await this.authService.validateUser(loginDto);
+    return this.authService.login(user);
   }
 
   @Post('otp-login')
