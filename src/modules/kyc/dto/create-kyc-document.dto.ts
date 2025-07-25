@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 
 export class CreateKycDocumentDto {
   @IsString()
@@ -12,4 +12,9 @@ export class CreateKycDocumentDto {
   @IsString()
   @IsNotEmpty()
   docURL: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  docNumber?: string;
 }
