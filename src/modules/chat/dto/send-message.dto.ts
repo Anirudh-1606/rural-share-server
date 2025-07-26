@@ -5,6 +5,9 @@ export class SendMessageDto {
   @IsMongoId()
   conversationId: string;
 
+  @IsMongoId()
+  recipientId: string;
+
   @IsEnum(MessageType)
   @IsOptional()
   type?: MessageType = MessageType.TEXT;

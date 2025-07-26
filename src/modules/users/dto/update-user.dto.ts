@@ -1,4 +1,6 @@
-import { IsBoolean, IsOptional, IsString, IsIn } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsIn, IsMongoId, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { UpdatePreferencesDto } from './update-preferences.dto';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -17,4 +19,13 @@ export class UpdateUserDto {
   @IsString()
   @IsIn(['none', 'pending', 'approved', 'rejected'])
   kycStatus?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UpdatePreferencesDto)
+  preferences?: UpdatePreferencesDto;
+
+  @IsOptional()
+  @IsMongoId()
+  defaultAddressId?: string;
 } 

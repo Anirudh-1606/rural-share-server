@@ -1,4 +1,6 @@
-import { IsString, IsEmail, MinLength, IsIn, Matches, IsPhoneNumber } from 'class-validator';
+import { IsString, IsEmail, MinLength, IsIn, Matches, IsPhoneNumber, IsOptional, IsMongoId, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { UpdatePreferencesDto } from './update-preferences.dto';
 
 export class CreateUserDto {
   @IsString()
@@ -16,10 +18,16 @@ export class CreateUserDto {
   @MinLength(6)
   password: string;
 
-  
-  
-
   @IsString()
   @IsIn(['individual', 'SHG', 'FPO', 'admin'])
   role: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UpdatePreferencesDto)
+  preferences?: UpdatePreferencesDto;
+
+  @IsOptional()
+  @IsMongoId()
+  defaultAddressId?: string;
 }
