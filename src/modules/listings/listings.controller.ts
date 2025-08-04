@@ -1,15 +1,20 @@
-import { Controller, Post, Get, Patch, Delete, Param, Body } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Param, Body, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { ListingsService } from './listings.service';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
+import { FilesInterceptor } from '@nestjs/platform-express';
 
 @Controller('listings')
 export class ListingsController {
   constructor(private readonly svc: ListingsService) {}
 
   @Post()
-  create(@Body() dto: CreateListingDto) {
-    return this.svc.create(dto);
+  @UseInterceptors(FilesInterceptor('photos', 10))
+  create(
+    @Body() dto: CreateListingDto,
+    @UploadedFiles() files: Array<Express.Multer.File>,
+  ) {
+    return this.svc.create(dto, files);
   }
 
   @Get()

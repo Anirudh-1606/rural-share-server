@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { Listing, ListingDocument } from './listings.schema';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
+import { S3Service } from '../aws/s3.service';
 
 export interface SearchFilters {
   categoryId?: string;
@@ -19,12 +20,17 @@ export interface SearchFilters {
 @Injectable()
 export class ListingsService {
   constructor(
-    @InjectModel(Listing.name) private listingModel: Model<ListingDocument>,
+    @InjectModel(Listing.name) private listingModel: Model<ListingDocument>,private readonly s3Service: S3Service,
   ) {}
 
-  async create(dto: CreateListingDto): Promise<Listing> {
+  async create(dto: CreateListingDto, files: Array<Express.Multer.File>): Promise<Listing> {
+    const photoURLs = await Promise.all(
+      files.map(file => this.s3Service.uploadFile(file, 'listings'))
+    );
+
     const listing = new this.listingModel({
       ...dto,
+      photos: photoURLs,
       location: {
         type: 'Point',
         coordinates: dto.coordinates
