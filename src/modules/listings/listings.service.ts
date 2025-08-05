@@ -23,22 +23,25 @@ export class ListingsService {
     @InjectModel(Listing.name) private listingModel: Model<ListingDocument>,private readonly s3Service: S3Service,
   ) {}
 
-  async create(dto: CreateListingDto, files: Array<Express.Multer.File>): Promise<Listing> {
-    const photoURLs = await Promise.all(
-      files.map(file => this.s3Service.uploadFile(file, 'listings'))
-    );
-
-    const listing = new this.listingModel({
-      ...dto,
-      photos: photoURLs,
-      location: {
-        type: 'Point',
-        coordinates: dto.coordinates
-      }
-    });
-    return listing.save();
-  }
-
+ async create(dto: CreateListingDto, files: Array<Express.Multer.File> = []): Promise<Listing> {
+  // Handle empty files array
+  console.log(files)
+  const photoURLs = files && files.length > 0 
+    ? await Promise.all(
+        files.map(file => this.s3Service.uploadFile(file, 'listings'))
+      )
+    : [];
+    console.log('Photo URLs:', photoURLs);
+  const listing = new this.listingModel({
+    ...dto,
+    photos: photoURLs,
+    location: {
+      type: 'Point',
+      coordinates: dto.coordinates
+    }
+  });
+  return listing.save();
+}
   async findAll(filters?: SearchFilters): Promise<Listing[]> {
     const query: any = { isActive: filters?.isActive ?? true };
 

@@ -10,10 +10,21 @@ export class ListingsController {
 
   @Post()
   @UseInterceptors(FilesInterceptor('photos', 10))
-  create(
-    @Body() dto: CreateListingDto,
+  async create(
     @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body('data') dataString: string,
   ) {
+    console.log('Received files:', files);
+    
+    // Parse JSON data
+    const listingData = JSON.parse(dataString);
+    
+    const dto: CreateListingDto = {
+      ...listingData,
+      photos: files?.map(file => file.filename) || []
+    };
+    
+    console.log('CreateListingDto:', dto);
     return this.svc.create(dto, files);
   }
 

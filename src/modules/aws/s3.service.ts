@@ -34,6 +34,9 @@ export class S3Service {
       Body: file.buffer,
       ContentType: file.mimetype,
     });
+    console.log("Uploading to S3 with key:", key);
+    console.log("Bucket Name:", this.bucketName);
+    console.log("Region:", this.region);  
 
     await this.s3Client.send(command);
 
