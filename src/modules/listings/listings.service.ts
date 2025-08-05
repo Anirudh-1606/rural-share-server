@@ -27,7 +27,7 @@ export class ListingsService {
       ...dto,
       location: {
         type: 'Point',
-        coordinates: dto.coordinates
+        coordinates: dto.location.coordinates
       }
     });
     return listing.save();
