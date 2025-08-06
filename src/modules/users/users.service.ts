@@ -42,7 +42,7 @@ export class UsersService {
   async findByPhone(phone: string): Promise<UserDocument | null> {
     console.log(`Searching for phone: ${phone}`);
     const user = await this.userModel.findOne({ phone }).exec();
-    console.log(`Found user: ${user ? user.email : 'null'}`);
+    console.log(`Found user: ${user ? user.name : 'null'}`);
     return user;
   }
 

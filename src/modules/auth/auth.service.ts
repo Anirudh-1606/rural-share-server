@@ -31,6 +31,7 @@ export class AuthService {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
     const { password: userPassword, ...result } = user.toObject();
+    console.log(`User ${user.name} authenticated successfully`);
     return result;
   }
 
