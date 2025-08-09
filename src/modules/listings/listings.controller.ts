@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Patch, Delete, Param, Body, UseInterceptors, UploadedFiles } from '@nestjs/common';
+// src/modules/listings/listings.controller.ts
+import { Controller, Post, Get, Patch, Delete, Param, Body, UseInterceptors, UploadedFiles, Query } from '@nestjs/common';
 import { ListingsService } from './listings.service';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
@@ -14,14 +15,13 @@ export class ListingsController {
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Body('data') dataString: string,
   ) {
-    console.log('Received files:', files);
+    console.log('Received files:', files?.length || 0);
     
     // Parse JSON data
     const listingData = JSON.parse(dataString);
     
     const dto: CreateListingDto = {
       ...listingData,
-      photos: files?.map(file => file.filename) || []
     };
     
     console.log('CreateListingDto:', dto);
@@ -29,8 +29,8 @@ export class ListingsController {
   }
 
   @Get()
-  findAll() {
-    return this.svc.findAll();
+  findAll(@Query() filters?: any) {
+    return this.svc.findAll(filters);
   }
 
   @Get('provider/:providerId')
@@ -51,5 +51,11 @@ export class ListingsController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.svc.delete(id);
+  }
+
+  // New endpoint to refresh pre-signed URLs
+  @Post(':id/refresh-urls')
+  refreshUrls(@Param('id') id: string) {
+    return this.svc.refreshUrls(id);
   }
 }
