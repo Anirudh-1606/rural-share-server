@@ -8,7 +8,7 @@ export class Listing {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   providerId: Types.ObjectId;
 
-  @Prop({ type: String, required: true })
+  @Prop({ type: String })
   title: string;
 
   @Prop({ type: String, required: true })
