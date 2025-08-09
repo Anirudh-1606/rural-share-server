@@ -1,18 +1,21 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsMongoId, 
-  IsArray, 
-  ArrayNotEmpty, 
-  ArrayMinSize, 
-  IsNumber, 
-  IsDateString, 
-  IsBoolean, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsMongoId,
+  IsArray,
+  ArrayNotEmpty,
+  IsNumber,
+  IsDateString,
+  IsBoolean,
   IsOptional,
   IsEnum,
   IsUrl,
-  Min
+  Min,
+  ValidateNested
 } from 'class-validator';
+
+import { Type } from 'class-transformer';
+import { LocationDto } from './location.dto';
 
 export enum UnitOfMeasure {
   PER_HOUR = 'per_hour',
@@ -27,12 +30,12 @@ export class CreateListingDto {
   providerId: string;
 
   @IsString()
-  @IsNotEmpty()
-  title: string;
+  @IsOptional()
+  title?: string;
 
   @IsString()
-  @IsNotEmpty()
-  description: string;
+  @IsOptional()
+  description?: string;
 
   @IsMongoId()
   categoryId: string;
@@ -41,19 +44,17 @@ export class CreateListingDto {
   subCategoryId: string;
 
   @IsArray()
-  @ArrayNotEmpty()
+  @IsOptional()
   @IsString({ each: true })
-  photos: string[];
+  photos?: string[];
 
   @IsUrl()
   @IsOptional()
   videoUrl?: string;
 
-  @IsArray()
-  @ArrayMinSize(2)
-  @ArrayMinSize(2)
-  @IsNumber({}, { each: true })
-  coordinates: number[]; // [longitude, latitude]
+  @ValidateNested()
+  @Type(() => LocationDto)
+  location: LocationDto;
 
   @IsNumber()
   @Min(0)

@@ -37,7 +37,7 @@ export class ListingsService {
     photos: photoURLs,
     location: {
       type: 'Point',
-      coordinates: dto.coordinates
+      coordinates: dto.location.coordinates
     }
   });
   return listing.save();
