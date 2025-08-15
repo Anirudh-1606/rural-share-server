@@ -123,7 +123,7 @@ export class ListingsController {
     const coordinates = [parseFloat(lng), parseFloat(lat)];
     const maxDistance = parseFloat(distance) || 10; // Default 10km
     const excludeProviderId = req.user?.userId || undefined;
-    return this.svc.findNearby(coordinates, maxDistance);
+    return this.svc.findNearby(coordinates, maxDistance, excludeProviderId);
   }
 
   @Get('public')

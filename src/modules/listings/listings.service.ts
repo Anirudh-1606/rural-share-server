@@ -16,6 +16,7 @@ export interface SearchFilters {
   searchText?: string;
   isActive?: boolean | string;
   providerId?: string;
+  excludeProviderId?: string; // ADD THIS
   tags?: string | string[];
   // Additional fields from app
   date?: string;
@@ -94,6 +95,11 @@ export class ListingsService {
 
       if (parsedFilters.providerId) {
         query.providerId = parsedFilters.providerId;
+      }
+
+      // EXCLUDE listings from specific provider (current user)
+      if (parsedFilters.excludeProviderId) {
+        query.providerId = { $ne: parsedFilters.excludeProviderId };
       }
 
       // Handle price range with proper number parsing
@@ -245,6 +251,11 @@ export class ListingsService {
       parsed.providerId = filters.providerId;
     }
     
+    // PARSE excludeProviderId
+    if (filters?.excludeProviderId && filters.excludeProviderId !== 'undefined') {
+      parsed.excludeProviderId = filters.excludeProviderId;
+    }
+    
     // Parse tags array
     if (filters?.tags) {
       if (typeof filters.tags === 'string') {
@@ -257,8 +268,8 @@ export class ListingsService {
     return parsed;
   }
 
-  async findNearby(coordinates: number[], maxDistance: number): Promise<any[]> {
-    const listings = await this.listingModel.find({
+  async findNearby(coordinates: number[], maxDistance: number, excludeProviderId?: string): Promise<any[]> {
+    const query: any = {
       isActive: true,
       location: {
         $near: {
@@ -269,11 +280,18 @@ export class ListingsService {
           $maxDistance: maxDistance * 1000 // Convert km to meters
         }
       }
-    })
-    .populate('categoryId', 'name')
-    .populate('subCategoryId', 'name')
-    .populate('providerId', 'name phone')
-    .exec();
+    };
+
+    // Exclude listings from specific provider if provided
+    if (excludeProviderId) {
+      query.providerId = { $ne: excludeProviderId };
+    }
+
+    const listings = await this.listingModel.find(query)
+      .populate('categoryId', 'name')
+      .populate('subCategoryId', 'name')
+      .populate('providerId', 'name phone')
+      .exec();
 
     return Promise.all(listings.map(listing => this.transformWithUrls(listing)));
   }
