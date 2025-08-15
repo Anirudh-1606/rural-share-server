@@ -6,6 +6,7 @@ import { ListingsService } from './listings.service';
 import { ListingsController } from './listings.controller';
 import { AvailabilitiesService } from './availabilities.service';
 import { AvailabilitiesController } from './availabilities.controller';
+import { AwsModule } from '../aws/aws.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { AvailabilitiesController } from './availabilities.controller';
       { name: Listing.name, schema: ListingSchema },
       { name: Availability.name, schema: AvailabilitySchema },
     ]),
+    AwsModule
   ],
   providers: [ListingsService, AvailabilitiesService],
   controllers: [ListingsController, AvailabilitiesController],
