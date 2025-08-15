@@ -1,10 +1,8 @@
 import { Controller, Get, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { ProvidersService } from './providers.service';
-import { AuthGuard } from '@nestjs/passport';
 import { UpdatePreferencesDto } from '../users/dto/update-preferences.dto';
 
 @Controller('providers')
-@UseGuards(AuthGuard('jwt'))
 export class ProvidersController {
   constructor(private readonly providersService: ProvidersService) {}
 

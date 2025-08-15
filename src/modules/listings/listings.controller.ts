@@ -1,4 +1,3 @@
-// src/modules/listings/listings.controller.ts
 import { Controller, Post, Get, Patch, Delete, Param, Body, UseInterceptors, UploadedFiles, Query } from '@nestjs/common';
 import { ListingsService } from './listings.service';
 import { CreateListingDto } from './dto/create-listing.dto';
@@ -33,11 +32,35 @@ export class ListingsController {
     return this.svc.findAll(filters);
   }
 
+  @Get('search')
+  search(@Query() filters: any) {
+    // Dedicated search endpoint - uses the same service method as findAll
+    return this.svc.findAll(filters);
+  }
+
+  @Get('nearby')
+  findNearby(
+    @Query('lat') lat: string,
+    @Query('lng') lng: string,
+    @Query('distance') distance: string
+  ) {
+    const coordinates = [parseFloat(lng), parseFloat(lat)];
+    const maxDistance = parseFloat(distance) || 10; // Default 10km
+    return this.svc.findNearby(coordinates, maxDistance);
+  }
+
   @Get('provider/:providerId')
   findByProvider(@Param('providerId') providerId: string) {
     return this.svc.findByProvider(providerId);
   }
 
+  // Move refresh-urls BEFORE :id route
+  @Post(':id/refresh-urls')
+  refreshUrls(@Param('id') id: string) {
+    return this.svc.refreshUrls(id);
+  }
+
+  // This should be the LAST GET route as it matches any string
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.svc.findById(id);
@@ -51,11 +74,5 @@ export class ListingsController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.svc.delete(id);
-  }
-
-  // New endpoint to refresh pre-signed URLs
-  @Post(':id/refresh-urls')
-  refreshUrls(@Param('id') id: string) {
-    return this.svc.refreshUrls(id);
   }
 }

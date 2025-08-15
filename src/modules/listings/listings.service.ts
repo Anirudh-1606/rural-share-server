@@ -1,5 +1,4 @@
-// src/modules/listings/listings.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Listing, ListingDocument } from './listings.schema';
@@ -10,12 +9,20 @@ import { S3Service } from '../aws/s3.service';
 export interface SearchFilters {
   categoryId?: string;
   subCategoryId?: string;
-  priceMin?: number;
-  priceMax?: number;
-  distance?: number;
-  coordinates?: number[];
+  priceMin?: number | string;
+  priceMax?: number | string;
+  distance?: number | string;
+  coordinates?: number[] | string;
   searchText?: string;
-  isActive?: boolean;
+  isActive?: boolean | string;
+  providerId?: string;
+  tags?: string | string[];
+  // Additional fields from app
+  date?: string;
+  latitude?: number | string;
+  longitude?: number | string;
+  radius?: number | string;
+  text?: string;
 }
 
 @Injectable()
@@ -66,48 +73,188 @@ export class ListingsService {
   }
 
   async findAll(filters?: SearchFilters): Promise<any[]> {
-    const query: any = { isActive: filters?.isActive ?? true };
+    try {
+      console.log('ListingsService.findAll - Raw filters:', filters);
+      
+      // Parse and validate filters
+      const parsedFilters = this.parseSearchFilters(filters);
+      
+      console.log('ListingsService.findAll - Parsed filters:', parsedFilters);
+      
+      const query: any = { isActive: parsedFilters.isActive ?? true };
 
-    if (filters?.categoryId) {
-      query.categoryId = filters.categoryId;
-    }
+      // Build query conditions
+      if (parsedFilters.categoryId) {
+        query.categoryId = parsedFilters.categoryId;
+      }
 
-    if (filters?.subCategoryId) {
-      query.subCategoryId = filters.subCategoryId;
-    }
+      if (parsedFilters.subCategoryId) {
+        query.subCategoryId = parsedFilters.subCategoryId;
+      }
 
-    if (filters?.priceMin || filters?.priceMax) {
-      query.price = {};
-      if (filters.priceMin) query.price.$gte = filters.priceMin;
-      if (filters.priceMax) query.price.$lte = filters.priceMax;
-    }
+      if (parsedFilters.providerId) {
+        query.providerId = parsedFilters.providerId;
+      }
 
-    if (filters?.coordinates && filters?.distance) {
-      query.location = {
-        $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: filters.coordinates
-          },
-          $maxDistance: filters.distance * 1000
+      // Handle price range with proper number parsing
+      if (parsedFilters.priceMin !== null || parsedFilters.priceMax !== null) {
+        const priceQuery: any = {};
+        if (parsedFilters.priceMin !== null) {
+          priceQuery.$gte = parsedFilters.priceMin;
         }
-      };
+        if (parsedFilters.priceMax !== null) {
+          priceQuery.$lte = parsedFilters.priceMax;
+        }
+        // Only add price query if it has constraints
+        if (Object.keys(priceQuery).length > 0) {
+          query.price = priceQuery;
+        }
+      }
+
+      if (parsedFilters.tags && parsedFilters.tags.length > 0) {
+        query.tags = { $in: parsedFilters.tags };
+      }
+
+      // Clean the query object to remove any undefined or "undefined" values
+      const cleanQuery = Object.entries(query).reduce((acc, [key, value]) => {
+        if (value !== undefined && value !== 'undefined' && value !== null) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as any);
+
+      // Build the query in stages to avoid conflicts
+      let queryBuilder;
+      
+      // Check if we're doing a text search
+      if (parsedFilters.searchText && parsedFilters.searchText.trim()) {
+        // For text search, we need to structure the query differently
+        // MongoDB doesn't allow combining $text with $near
+        if (parsedFilters.coordinates && parsedFilters.distance) {
+          console.log('ListingsService.findAll - Warning: Cannot combine text search with location search. Using text search only.');
+        }
+        
+        // Create a new query object for text search
+        const textSearchQuery = {
+          $text: { $search: parsedFilters.searchText },
+          ...cleanQuery  // Include other filters
+        };
+        
+        queryBuilder = this.listingModel.find(textSearchQuery);
+      } else if (parsedFilters.coordinates && parsedFilters.distance) {
+        // Location-based search without text
+        queryBuilder = this.listingModel.find(cleanQuery);
+      } else {
+        // Regular query without text or location search
+        queryBuilder = this.listingModel.find(cleanQuery);
+      }
+
+      console.log('ListingsService.findAll - Final query:', JSON.stringify(cleanQuery, null, 2));
+      console.log('ListingsService.findAll - Executing query...');
+
+      const listings = await queryBuilder
+        .populate('categoryId', 'name')
+        .populate('subCategoryId', 'name')
+        .populate('providerId', 'name phone')
+        .sort({ createdAt: -1 }) // Most recent first
+        .exec();
+
+      // Transform all listings with pre-signed URLs
+      return Promise.all(listings.map(listing => this.transformWithUrls(listing)));
+    } catch (error) {
+      console.error('ListingsService.findAll - Error:', error);
+      throw new BadRequestException(`Failed to search listings: ${error.message}`);
     }
+  }
 
-    let queryBuilder = this.listingModel.find(query);
-
-    if (filters?.searchText) {
-      queryBuilder = queryBuilder.find({ $text: { $search: filters.searchText } });
+  // Helper method to parse and validate search filters
+  private parseSearchFilters(filters: any): any {
+    const parsed: any = {};
+    
+    // Parse boolean values
+    if (filters?.isActive !== undefined) {
+      parsed.isActive = filters.isActive === 'true' || filters.isActive === true;
     }
-
-    const listings = await queryBuilder
-      .populate('categoryId', 'name')
-      .populate('subCategoryId', 'name')
-      .populate('providerId', 'name phone')
-      .exec();
-
-    // Transform all listings with pre-signed URLs
-    return Promise.all(listings.map(listing => this.transformWithUrls(listing)));
+    
+    // Parse numeric values
+    if (filters?.priceMin !== undefined && filters.priceMin !== 'undefined' && filters.priceMin !== '') {
+      const priceMin = parseFloat(filters.priceMin);
+      parsed.priceMin = isNaN(priceMin) ? null : priceMin;
+    } else {
+      parsed.priceMin = null;
+    }
+    
+    if (filters?.priceMax !== undefined && filters.priceMax !== 'undefined' && filters.priceMax !== '') {
+      const priceMax = parseFloat(filters.priceMax);
+      parsed.priceMax = isNaN(priceMax) ? null : priceMax;
+    } else {
+      parsed.priceMax = null;
+    }
+    
+    // Parse coordinates
+    if (filters?.coordinates) {
+      if (typeof filters.coordinates === 'string') {
+        try {
+          parsed.coordinates = JSON.parse(filters.coordinates);
+        } catch (e) {
+          // Try parsing as comma-separated values
+          const coords = filters.coordinates.split(',').map(c => parseFloat(c.trim()));
+          if (coords.length === 2 && !coords.some(isNaN)) {
+            parsed.coordinates = coords;
+          }
+        }
+      } else if (Array.isArray(filters.coordinates)) {
+        parsed.coordinates = filters.coordinates.map(c => parseFloat(c));
+      }
+    } else if (filters?.latitude && filters?.longitude) {
+      // Handle case where app sends latitude/longitude separately
+      const lat = parseFloat(filters.latitude);
+      const lng = parseFloat(filters.longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        parsed.coordinates = [lng, lat]; // MongoDB expects [longitude, latitude]
+      }
+    }
+    
+    // Handle radius/distance
+    if (filters?.distance !== undefined && filters.distance !== 'undefined' && filters.distance !== '') {
+      const distance = parseFloat(filters.distance);
+      parsed.distance = isNaN(distance) ? null : distance;
+    } else if (filters?.radius !== undefined && filters.radius !== 'undefined' && filters.radius !== '') {
+      // Handle case where app sends 'radius' instead of 'distance'
+      const radius = parseFloat(filters.radius);
+      parsed.distance = isNaN(radius) ? null : radius;
+    }
+    
+    // Copy string values as-is
+    if (filters?.searchText && filters.searchText !== 'undefined') {
+      parsed.searchText = filters.searchText;
+    } else if (filters?.text && filters.text !== 'undefined') {
+      // Handle case where app sends 'text' instead of 'searchText'
+      parsed.searchText = filters.text;
+    }
+    
+    if (filters?.categoryId && filters.categoryId !== 'undefined') {
+      parsed.categoryId = filters.categoryId;
+    }
+    
+    if (filters?.subCategoryId && filters.subCategoryId !== 'undefined') {
+      parsed.subCategoryId = filters.subCategoryId;
+    }
+    
+    if (filters?.providerId && filters.providerId !== 'undefined') {
+      parsed.providerId = filters.providerId;
+    }
+    
+    // Parse tags array
+    if (filters?.tags) {
+      if (typeof filters.tags === 'string') {
+        parsed.tags = [filters.tags];
+      } else if (Array.isArray(filters.tags)) {
+        parsed.tags = filters.tags;
+      }
+    }
+    
+    return parsed;
   }
 
   async findNearby(coordinates: number[], maxDistance: number): Promise<any[]> {
@@ -119,7 +266,7 @@ export class ListingsService {
             type: 'Point',
             coordinates
           },
-          $maxDistance: maxDistance * 1000
+          $maxDistance: maxDistance * 1000 // Convert km to meters
         }
       }
     })
@@ -132,7 +279,12 @@ export class ListingsService {
   }
 
   async findByProvider(providerId: string): Promise<any[]> {
-    const listings = await this.listingModel.find({ providerId }).exec();
+    const listings = await this.listingModel
+      .find({ providerId })
+      .populate('categoryId', 'name')
+      .populate('subCategoryId', 'name')
+      .sort({ createdAt: -1 })
+      .exec();
     return Promise.all(listings.map(listing => this.transformWithUrls(listing)));
   }
 
@@ -172,6 +324,9 @@ export class ListingsService {
 
     const updated = await this.listingModel
       .findByIdAndUpdate(id, updateData, { new: true })
+      .populate('categoryId')
+      .populate('subCategoryId')
+      .populate('providerId')
       .exec();
       
     if (!updated) throw new NotFoundException('Listing not found');
@@ -228,6 +383,9 @@ export class ListingsService {
   async toggleListingStatus(id: string, isActive: boolean): Promise<any> {
     const updated = await this.listingModel
       .findByIdAndUpdate(id, { isActive }, { new: true })
+      .populate('categoryId')
+      .populate('subCategoryId')
+      .populate('providerId')
       .exec();
       
     if (!updated) throw new NotFoundException('Listing not found');
