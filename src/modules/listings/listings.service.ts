@@ -5,6 +5,9 @@ import { Listing, ListingDocument } from './listings.schema';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { S3Service } from '../aws/s3.service';
+import { UsersService } from '../users/users.service';
+import { AddressesService } from '../addresses/addresses.service';
+import { Catalogue, CatalogueDocument } from '../catalogue/catalogue.schema'; // Add this import
 
 export interface SearchFilters {
   categoryId?: string;
@@ -16,7 +19,7 @@ export interface SearchFilters {
   searchText?: string;
   isActive?: boolean | string;
   providerId?: string;
-  excludeProviderId?: string; // ADD THIS
+  excludeProviderId?: string;
   tags?: string | string[];
   // Additional fields from app
   date?: string;
@@ -30,7 +33,10 @@ export interface SearchFilters {
 export class ListingsService {
   constructor(
     @InjectModel(Listing.name) private listingModel: Model<ListingDocument>,
+    @InjectModel(Catalogue.name) private catalogueModel: Model<CatalogueDocument>, // Add this
     private readonly s3Service: S3Service,
+    private readonly usersService: UsersService,
+    private readonly addressesService: AddressesService, 
   ) {}
 
   async create(dto: CreateListingDto, files: Array<Express.Multer.File> = []): Promise<any> {
@@ -43,10 +49,11 @@ export class ListingsService {
     
     console.log('Photo keys:', photoKeys);
 
-    // Handle both coordinate formats for backward compatibility
+    // Handle location data
     let locationData;
+    
+    // First check if location is provided in the DTO
     if (dto.location && dto.location.coordinates) {
-      // New format: location object with coordinates
       locationData = {
         type: 'Point',
         coordinates: dto.location.coordinates
@@ -58,12 +65,35 @@ export class ListingsService {
         coordinates: (dto as any).coordinates
       };
     } else {
-      throw new Error('Location coordinates are required');
+      // If no location provided, use user's default address
+      console.log('No location provided, fetching user default address...');
+      
+      const user = await this.usersService.getUserWithAddress(dto.providerId);
+      
+      if (user.defaultAddressId && user.defaultAddressId.coordinates) {
+        console.log('Using user default address coordinates:', user.defaultAddressId.coordinates);
+        locationData = {
+          type: 'Point',
+          coordinates: user.defaultAddressId.coordinates
+        };
+      } else {
+        // If user has no default address, try to get their first address
+        const userAddresses = await this.addressesService.findAllByUser(dto.providerId);
+        if (userAddresses.length > 0 && userAddresses[0].coordinates) {
+          console.log('Using user first address coordinates:', userAddresses[0].coordinates);
+          locationData = {
+            type: 'Point',
+            coordinates: userAddresses[0].coordinates
+          };
+        } else {
+          throw new BadRequestException('No address found for user. Please add an address to your profile first.');
+        }
+      }
     }
 
     const listing = new this.listingModel({
       ...dto,
-      photos: photoKeys, // Store only S3 keys
+      photos: photoKeys,
       location: locationData
     });
     
@@ -77,100 +107,267 @@ export class ListingsService {
     try {
       console.log('ListingsService.findAll - Raw filters:', filters);
       
-      // Parse and validate filters
       const parsedFilters = this.parseSearchFilters(filters);
-      
       console.log('ListingsService.findAll - Parsed filters:', parsedFilters);
       
-      const query: any = { isActive: parsedFilters.isActive ?? true };
-
-      // Build query conditions
-      if (parsedFilters.categoryId) {
-        query.categoryId = parsedFilters.categoryId;
-      }
-
-      if (parsedFilters.subCategoryId) {
-        query.subCategoryId = parsedFilters.subCategoryId;
-      }
-
-      if (parsedFilters.providerId) {
-        query.providerId = parsedFilters.providerId;
-      }
-
-      // EXCLUDE listings from specific provider (current user)
-      if (parsedFilters.excludeProviderId) {
-        query.providerId = { $ne: parsedFilters.excludeProviderId };
-      }
-
-      // Handle price range with proper number parsing
-      if (parsedFilters.priceMin !== null || parsedFilters.priceMax !== null) {
-        const priceQuery: any = {};
-        if (parsedFilters.priceMin !== null) {
-          priceQuery.$gte = parsedFilters.priceMin;
+      // Enhanced search logic: Check for category/subcategory matches first
+      if (parsedFilters.searchText && parsedFilters.searchText.trim() && 
+          !parsedFilters.categoryId && !parsedFilters.subCategoryId) {
+        
+        const searchTerm = parsedFilters.searchText.trim();
+        console.log('Searching for category/subcategory match for:', searchTerm);
+        
+        // Step 1: Search for matching category (case-insensitive)
+        const categoryMatch = await this.catalogueModel.findOne({
+          name: new RegExp(`^${searchTerm}$`, 'i'),
+          parentId: null // Categories have no parent
+        }).exec();
+        
+        if (categoryMatch) {
+          console.log('Found matching category:', categoryMatch.name);
+          parsedFilters.categoryId = categoryMatch._id.toString();
+          // Clear the search text since we're using category filter
+          delete parsedFilters.searchText;
+        } else {
+          // Step 2: Search for matching subcategory
+          const subCategoryMatch = await this.catalogueModel.findOne({
+            name: new RegExp(`^${searchTerm}$`, 'i'),
+            parentId: { $ne: null } // Subcategories have a parent
+          }).exec();
+          
+          if (subCategoryMatch) {
+            console.log('Found matching subcategory:', subCategoryMatch.name);
+            parsedFilters.subCategoryId = subCategoryMatch._id.toString();
+            // Clear the search text since we're using subcategory filter
+            delete parsedFilters.searchText;
+          } else {
+            console.log('No category/subcategory match found, will search in descriptions only');
+            // Keep searchText for description-only search
+          }
         }
-        if (parsedFilters.priceMax !== null) {
-          priceQuery.$lte = parsedFilters.priceMax;
-        }
-        // Only add price query if it has constraints
-        if (Object.keys(priceQuery).length > 0) {
-          query.price = priceQuery;
-        }
       }
-
-      if (parsedFilters.tags && parsedFilters.tags.length > 0) {
-        query.tags = { $in: parsedFilters.tags };
-      }
-
-      // Clean the query object to remove any undefined or "undefined" values
-      const cleanQuery = Object.entries(query).reduce((acc, [key, value]) => {
-        if (value !== undefined && value !== 'undefined' && value !== null) {
-          acc[key] = value;
-        }
-        return acc;
-      }, {} as any);
-
-      // Build the query in stages to avoid conflicts
-      let queryBuilder;
       
-      // Check if we're doing a text search
-      if (parsedFilters.searchText && parsedFilters.searchText.trim()) {
-        // For text search, we need to structure the query differently
-        // MongoDB doesn't allow combining $text with $near
-        if (parsedFilters.coordinates && parsedFilters.distance) {
-          console.log('ListingsService.findAll - Warning: Cannot combine text search with location search. Using text search only.');
+      // Check if we need distance-based sorting
+      const needsDistanceSort = parsedFilters.coordinates && parsedFilters.distance;
+      
+      let listings;
+      
+      if (needsDistanceSort) {
+        // Use aggregation pipeline for distance-based search with sorting
+        const pipeline: any[] = [];
+        
+        // Build the base query for geoNear
+        const geoQuery: any = { isActive: parsedFilters.isActive ?? true };
+        
+        if (parsedFilters.categoryId) {
+          geoQuery.categoryId = new (this.listingModel as any).base.Types.ObjectId(parsedFilters.categoryId);
         }
         
-        // Create a new query object for text search
-        const textSearchQuery = {
-          $text: { $search: parsedFilters.searchText },
-          ...cleanQuery  // Include other filters
-        };
+        if (parsedFilters.subCategoryId) {
+          geoQuery.subCategoryId = new (this.listingModel as any).base.Types.ObjectId(parsedFilters.subCategoryId);
+        }
         
-        queryBuilder = this.listingModel.find(textSearchQuery);
-      } else if (parsedFilters.coordinates && parsedFilters.distance) {
-        // Location-based search without text
-        queryBuilder = this.listingModel.find(cleanQuery);
+        if (parsedFilters.excludeProviderId) {
+          geoQuery.providerId = { $ne: new (this.listingModel as any).base.Types.ObjectId(parsedFilters.excludeProviderId) };
+        }
+        
+        if (parsedFilters.priceMin !== null || parsedFilters.priceMax !== null) {
+          const priceQuery: any = {};
+          if (parsedFilters.priceMin !== null) {
+            priceQuery.$gte = parsedFilters.priceMin;
+          }
+          if (parsedFilters.priceMax !== null) {
+            priceQuery.$lte = parsedFilters.priceMax;
+          }
+          if (Object.keys(priceQuery).length > 0) {
+            geoQuery.price = priceQuery;
+          }
+        }
+        
+        // Modified text search: only search in description if searchText exists
+        if (parsedFilters.searchText && parsedFilters.searchText.trim()) {
+          const searchRegex = new RegExp(parsedFilters.searchText.trim(), 'i');
+          // Only search in description field
+          geoQuery.description = searchRegex;
+        }
+        
+        // Add geoNear stage with all filters included
+        pipeline.push({
+          $geoNear: {
+            near: {
+              type: 'Point',
+              coordinates: parsedFilters.coordinates
+            },
+            distanceField: 'distance',
+            maxDistance: parsedFilters.distance * 1000, // Convert km to meters
+            spherical: true,
+            query: geoQuery // All filters are now in the geoNear query
+          }
+        });
+        
+        // Add lookups for populating references
+        pipeline.push(
+          {
+            $lookup: {
+              from: 'catalogues',
+              localField: 'categoryId',
+              foreignField: '_id',
+              as: 'categoryId'
+            }
+          },
+          {
+            $unwind: {
+              path: '$categoryId',
+              preserveNullAndEmptyArrays: true
+            }
+          },
+          {
+            $lookup: {
+              from: 'catalogues',
+              localField: 'subCategoryId',
+              foreignField: '_id',
+              as: 'subCategoryId'
+            }
+          },
+          {
+            $unwind: {
+              path: '$subCategoryId',
+              preserveNullAndEmptyArrays: true
+            }
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'providerId',
+              foreignField: '_id',
+              as: 'providerId'
+            }
+          },
+          {
+            $unwind: {
+              path: '$providerId',
+              preserveNullAndEmptyArrays: true
+            }
+          }
+        );
+        
+        // Sort by distance (nearest first)
+        pipeline.push({
+          $sort: { distance: 1 }
+        });
+        
+        console.log('Using aggregation pipeline for distance-based search');
+        listings = await this.listingModel.aggregate(pipeline).exec();
+        
       } else {
-        // Regular query without text or location search
-        queryBuilder = this.listingModel.find(cleanQuery);
+        // Regular query without distance sorting
+        const query: any = { isActive: parsedFilters.isActive ?? true };
+        
+        if (parsedFilters.categoryId) {
+          query.categoryId = parsedFilters.categoryId;
+        }
+        
+        if (parsedFilters.subCategoryId) {
+          query.subCategoryId = parsedFilters.subCategoryId;
+        }
+        
+        if (parsedFilters.excludeProviderId) {
+          query.providerId = { $ne: parsedFilters.excludeProviderId };
+        }
+        
+        if (parsedFilters.priceMin !== null || parsedFilters.priceMax !== null) {
+          const priceQuery: any = {};
+          if (parsedFilters.priceMin !== null) {
+            priceQuery.$gte = parsedFilters.priceMin;
+          }
+          if (parsedFilters.priceMax !== null) {
+            priceQuery.$lte = parsedFilters.priceMax;
+          }
+          if (Object.keys(priceQuery).length > 0) {
+            query.price = priceQuery;
+          }
+        }
+        
+        if (parsedFilters.tags && parsedFilters.tags.length > 0) {
+          query.tags = { $in: parsedFilters.tags };
+        }
+        
+        // Modified text search logic
+        if (parsedFilters.searchText && parsedFilters.searchText.trim()) {
+          // If we still have searchText here, it means no category/subcategory match was found
+          // Search only in description field
+          const searchRegex = new RegExp(parsedFilters.searchText.trim(), 'i');
+          query.description = searchRegex;
+        }
+        
+        listings = await this.listingModel.find(query)
+          .populate('categoryId', 'name')
+          .populate('subCategoryId', 'name')
+          .populate('providerId', 'name phone')
+          .sort({ createdAt: -1 })
+          .exec();
       }
-
-      console.log('ListingsService.findAll - Final query:', JSON.stringify(cleanQuery, null, 2));
-      console.log('ListingsService.findAll - Executing query...');
-
-      const listings = await queryBuilder
-        .populate('categoryId', 'name')
-        .populate('subCategoryId', 'name')
-        .populate('providerId', 'name phone')
-        .sort({ createdAt: -1 }) // Most recent first
-        .exec();
-
+      
       // Transform all listings with pre-signed URLs
       return Promise.all(listings.map(listing => this.transformWithUrls(listing)));
+      
     } catch (error) {
       console.error('ListingsService.findAll - Error:', error);
       throw new BadRequestException(`Failed to search listings: ${error.message}`);
     }
+  }
+
+  // Add this new method for smart search that can be called directly
+  async smartSearch(searchText: string, otherFilters?: Partial<SearchFilters>): Promise<{
+    listings: any[];
+    searchType: 'category' | 'subcategory' | 'description';
+    matchedTerm?: string;
+  }> {
+    const searchTerm = searchText.trim();
+    let searchType: 'category' | 'subcategory' | 'description' = 'description';
+    let matchedTerm: string | undefined;
+    
+    // Check for category match
+    const categoryMatch = await this.catalogueModel.findOne({
+      name: new RegExp(`^${searchTerm}$`, 'i'),
+      parentId: null
+    }).exec();
+    
+    if (categoryMatch) {
+      searchType = 'category';
+      matchedTerm = categoryMatch.name;
+      const filters = {
+        ...otherFilters,
+        categoryId: categoryMatch._id.toString()
+      };
+      const listings = await this.findAll(filters);
+      return { listings, searchType, matchedTerm };
+    }
+    
+    // Check for subcategory match
+    const subCategoryMatch = await this.catalogueModel.findOne({
+      name: new RegExp(`^${searchTerm}$`, 'i'),
+      parentId: { $ne: null }
+    }).exec();
+    
+    if (subCategoryMatch) {
+      searchType = 'subcategory';
+      matchedTerm = subCategoryMatch.name;
+      const filters = {
+        ...otherFilters,
+        subCategoryId: subCategoryMatch._id.toString()
+      };
+      const listings = await this.findAll(filters);
+      return { listings, searchType, matchedTerm };
+    }
+    
+    // Fall back to description search
+    const filters = {
+      ...otherFilters,
+      searchText: searchTerm
+    };
+    const listings = await this.findAll(filters);
+    return { listings, searchType };
   }
 
   // Helper method to parse and validate search filters

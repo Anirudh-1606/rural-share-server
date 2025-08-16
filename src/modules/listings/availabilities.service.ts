@@ -4,11 +4,12 @@ import { Model } from 'mongoose';
 import { Availability, AvailabilityDocument, DayOfWeek } from './availability.schema';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
+import { S3Service } from '../aws/s3.service'; 
 
 @Injectable()
 export class AvailabilitiesService {
   constructor(
-    @InjectModel(Availability.name) private availModel: Model<AvailabilityDocument>,
+    @InjectModel(Availability.name) private availModel: Model<AvailabilityDocument>,private readonly s3Service: S3Service
   ) {}
 
   async create(dto: CreateAvailabilityDto): Promise<Availability> {
