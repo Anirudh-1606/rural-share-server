@@ -16,7 +16,7 @@ import { Catalogue, CatalogueSchema } from '../catalogue/catalogue.schema';
     MongooseModule.forFeature([
       { name: Listing.name, schema: ListingSchema },
       { name: Availability.name, schema: AvailabilitySchema },
-       { name: Catalogue.name, schema: CatalogueSchema }
+      { name: Catalogue.name, schema: CatalogueSchema }
     ]),
     AwsModule, 
     UsersModule, 
@@ -24,6 +24,6 @@ import { Catalogue, CatalogueSchema } from '../catalogue/catalogue.schema';
   ],
   providers: [ListingsService, AvailabilitiesService],
   controllers: [ListingsController, AvailabilitiesController],
-  exports: [ListingsService], // ADD THIS LINE!
+  exports: [ListingsService],
 })
 export class ListingsModule {}
