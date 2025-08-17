@@ -5,7 +5,7 @@ import { UpdateAddressDto } from './dto/update-address.dto';
 import { AuthGuard } from '@nestjs/passport';
 
 @Controller('addresses')
-@UseGuards(AuthGuard('jwt'))
+// @UseGuards(AuthGuard('jwt'))
 export class AddressesController {
   constructor(private readonly addressesService: AddressesService) {}
 
