@@ -1,10 +1,14 @@
+// src/modules/listings/listings.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Listing, ListingDocument } from './listings.schema';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { S3Service } from '../aws/s3.service';
+import { UsersService } from '../users/users.service';
+import { AddressesService } from '../addresses/addresses.service';
+import { Catalogue, CatalogueDocument } from '../catalogue/catalogue.schema';
 
 export interface SearchFilters {
   categoryId?: string;
@@ -16,9 +20,8 @@ export interface SearchFilters {
   searchText?: string;
   isActive?: boolean | string;
   providerId?: string;
-  excludeProviderId?: string; // ADD THIS
+  excludeProviderId?: string;
   tags?: string | string[];
-  // Additional fields from app
   date?: string;
   latitude?: number | string;
   longitude?: number | string;
@@ -30,10 +33,18 @@ export interface SearchFilters {
 export class ListingsService {
   constructor(
     @InjectModel(Listing.name) private listingModel: Model<ListingDocument>,
+    @InjectModel(Catalogue.name) private catalogueModel: Model<CatalogueDocument>,
     private readonly s3Service: S3Service,
+    private readonly usersService: UsersService,
+    private readonly addressesService: AddressesService, 
   ) {}
 
   async create(dto: CreateListingDto, files: Array<Express.Multer.File> = []): Promise<any> {
+    // Validate providerId
+    if (!dto.providerId || !Types.ObjectId.isValid(dto.providerId)) {
+      throw new BadRequestException('Invalid provider ID');
+    }
+
     // Upload files and get S3 keys
     const photoKeys = files && files.length > 0 
       ? await Promise.all(
@@ -43,248 +54,285 @@ export class ListingsService {
     
     console.log('Photo keys:', photoKeys);
 
-    // Handle both coordinate formats for backward compatibility
+    // Handle location data
     let locationData;
+    
     if (dto.location && dto.location.coordinates) {
-      // New format: location object with coordinates
       locationData = {
         type: 'Point',
         coordinates: dto.location.coordinates
       };
     } else if ((dto as any).coordinates) {
-      // Legacy format: coordinates directly
       locationData = {
         type: 'Point',
         coordinates: (dto as any).coordinates
       };
     } else {
-      throw new Error('Location coordinates are required');
+      console.log('No location provided, fetching user default address...');
+      
+      const user = await this.usersService.getUserWithAddress(dto.providerId);
+      
+      if (user.defaultAddressId && user.defaultAddressId.coordinates) {
+        console.log('Using user default address coordinates:', user.defaultAddressId.coordinates);
+        locationData = {
+          type: 'Point',
+          coordinates: user.defaultAddressId.coordinates
+        };
+      } else {
+        const userAddresses = await this.addressesService.findAllByUser(dto.providerId);
+        if (userAddresses.length > 0 && userAddresses[0].coordinates) {
+          console.log('Using user first address coordinates:', userAddresses[0].coordinates);
+          locationData = {
+            type: 'Point',
+            coordinates: userAddresses[0].coordinates
+          };
+        } else {
+          throw new BadRequestException('No address found for user. Please add an address to your profile first.');
+        }
+      }
     }
 
     const listing = new this.listingModel({
       ...dto,
-      photos: photoKeys, // Store only S3 keys
+      photos: photoKeys,
       location: locationData
     });
     
     const saved = await listing.save();
     
-    // Return with pre-signed URLs
-    return this.transformWithUrls(saved);
+    // Return with public URLs (no async needed!)
+    return this.transformWithPublicUrls(saved);
   }
 
   async findAll(filters?: SearchFilters): Promise<any[]> {
     try {
       console.log('ListingsService.findAll - Raw filters:', filters);
       
-      // Parse and validate filters
       const parsedFilters = this.parseSearchFilters(filters);
-      
       console.log('ListingsService.findAll - Parsed filters:', parsedFilters);
       
-      const query: any = { isActive: parsedFilters.isActive ?? true };
-
-      // Build query conditions
-      if (parsedFilters.categoryId) {
-        query.categoryId = parsedFilters.categoryId;
-      }
-
-      if (parsedFilters.subCategoryId) {
-        query.subCategoryId = parsedFilters.subCategoryId;
-      }
-
-      if (parsedFilters.providerId) {
-        query.providerId = parsedFilters.providerId;
-      }
-
-      // EXCLUDE listings from specific provider (current user)
-      if (parsedFilters.excludeProviderId) {
-        query.providerId = { $ne: parsedFilters.excludeProviderId };
-      }
-
-      // Handle price range with proper number parsing
-      if (parsedFilters.priceMin !== null || parsedFilters.priceMax !== null) {
-        const priceQuery: any = {};
-        if (parsedFilters.priceMin !== null) {
-          priceQuery.$gte = parsedFilters.priceMin;
-        }
-        if (parsedFilters.priceMax !== null) {
-          priceQuery.$lte = parsedFilters.priceMax;
-        }
-        // Only add price query if it has constraints
-        if (Object.keys(priceQuery).length > 0) {
-          query.price = priceQuery;
-        }
-      }
-
-      if (parsedFilters.tags && parsedFilters.tags.length > 0) {
-        query.tags = { $in: parsedFilters.tags };
-      }
-
-      // Clean the query object to remove any undefined or "undefined" values
-      const cleanQuery = Object.entries(query).reduce((acc, [key, value]) => {
-        if (value !== undefined && value !== 'undefined' && value !== null) {
-          acc[key] = value;
-        }
-        return acc;
-      }, {} as any);
-
-      // Build the query in stages to avoid conflicts
-      let queryBuilder;
-      
-      // Check if we're doing a text search
-      if (parsedFilters.searchText && parsedFilters.searchText.trim()) {
-        // For text search, we need to structure the query differently
-        // MongoDB doesn't allow combining $text with $near
-        if (parsedFilters.coordinates && parsedFilters.distance) {
-          console.log('ListingsService.findAll - Warning: Cannot combine text search with location search. Using text search only.');
-        }
+      // Search for category/subcategory match
+      if (parsedFilters.searchText && parsedFilters.searchText.trim() && 
+          !parsedFilters.categoryId && !parsedFilters.subCategoryId) {
         
-        // Create a new query object for text search
-        const textSearchQuery = {
-          $text: { $search: parsedFilters.searchText },
-          ...cleanQuery  // Include other filters
+        const searchTerm = parsedFilters.searchText.trim();
+        console.log('Searching for category/subcategory match for:', searchTerm);
+        
+        const categoryMatch = await this.catalogueModel.findOne({
+          name: new RegExp(`^${searchTerm}$`, 'i'),
+          parentId: null
+        } as any).exec();
+        
+        if (categoryMatch) {
+          console.log('Found matching category:', categoryMatch.name);
+          parsedFilters.categoryId = categoryMatch._id.toString();
+          delete parsedFilters.searchText;
+        } else {
+          const subCategoryMatch = await this.catalogueModel.findOne({
+            name: new RegExp(`^${searchTerm}$`, 'i'),
+            parentId: { $ne: null }
+          } as any).exec();
+          
+          if (subCategoryMatch) {
+            console.log('Found matching subcategory:', subCategoryMatch.name);
+            parsedFilters.subCategoryId = subCategoryMatch._id.toString();
+            delete parsedFilters.searchText;
+          }
+        }
+      }
+      
+      const needsDistanceSort = parsedFilters.coordinates && parsedFilters.distance;
+      
+      let listings;
+      
+      if (needsDistanceSort) {
+        // Aggregation pipeline for distance-based search
+        const pipeline: any[] = [];
+        
+        const geoQuery: any = { 
+          isActive: parsedFilters.isActive ?? true,
+          // Add validation to ensure providerId exists and is valid
+          providerId: { $exists: true, $nin: [null, ''] }
         };
         
-        queryBuilder = this.listingModel.find(textSearchQuery);
-      } else if (parsedFilters.coordinates && parsedFilters.distance) {
-        // Location-based search without text
-        queryBuilder = this.listingModel.find(cleanQuery);
+        if (parsedFilters.categoryId) {
+          geoQuery.categoryId = new Types.ObjectId(parsedFilters.categoryId);
+        }
+        
+        if (parsedFilters.subCategoryId) {
+          geoQuery.subCategoryId = new Types.ObjectId(parsedFilters.subCategoryId);
+        }
+        
+        if (parsedFilters.excludeProviderId && Types.ObjectId.isValid(parsedFilters.excludeProviderId)) {
+          geoQuery.providerId.$ne = new Types.ObjectId(parsedFilters.excludeProviderId);
+        }
+        
+        if (parsedFilters.searchText && parsedFilters.searchText.trim()) {
+          const searchRegex = new RegExp(parsedFilters.searchText.trim(), 'i');
+          geoQuery.description = searchRegex;
+        }
+        
+        pipeline.push({
+          $geoNear: {
+            near: {
+              type: 'Point',
+              coordinates: parsedFilters.coordinates
+            },
+            distanceField: 'distance',
+            maxDistance: parsedFilters.distance * 1000,
+            spherical: true,
+            query: geoQuery
+          }
+        });
+        
+        // Add lookups with proper error handling
+        pipeline.push(
+          {
+            $lookup: {
+              from: 'catalogues',
+              localField: 'categoryId',
+              foreignField: '_id',
+              as: 'categoryId'
+            }
+          },
+          {
+            $unwind: {
+              path: '$categoryId',
+              preserveNullAndEmptyArrays: true
+            }
+          },
+          {
+            $lookup: {
+              from: 'catalogues',
+              localField: 'subCategoryId',
+              foreignField: '_id',
+              as: 'subCategoryId'
+            }
+          },
+          {
+            $unwind: {
+              path: '$subCategoryId',
+              preserveNullAndEmptyArrays: true
+            }
+          },
+          {
+            $lookup: {
+              from: 'users',
+              let: { providerId: '$providerId' },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $ne: ['$$providerId', null] },
+                        { $ne: ['$$providerId', ''] },
+                        { $eq: ['$_id', '$$providerId'] }
+                      ]
+                    }
+                  }
+                }
+              ],
+              as: 'providerId'
+            }
+          },
+          {
+            $unwind: {
+              path: '$providerId',
+              preserveNullAndEmptyArrays: true
+            }
+          }
+        );
+        
+        pipeline.push({
+          $sort: { distance: 1 }
+        });
+        
+        listings = await this.listingModel.aggregate(pipeline).exec();
+        
       } else {
-        // Regular query without text or location search
-        queryBuilder = this.listingModel.find(cleanQuery);
+        // Regular query
+        const query: any = { 
+          isActive: parsedFilters.isActive ?? true,
+          // Add validation to ensure providerId exists and is valid
+          providerId: { $exists: true, $nin: [null, ''] }
+        };
+        
+        if (parsedFilters.categoryId) {
+          query.categoryId = parsedFilters.categoryId;
+        }
+        
+        if (parsedFilters.subCategoryId) {
+          query.subCategoryId = parsedFilters.subCategoryId;
+        }
+        
+        if (parsedFilters.excludeProviderId && Types.ObjectId.isValid(parsedFilters.excludeProviderId)) {
+          query.providerId.$ne = parsedFilters.excludeProviderId;
+        }
+        
+        if (parsedFilters.searchText && parsedFilters.searchText.trim()) {
+          const searchRegex = new RegExp(parsedFilters.searchText.trim(), 'i');
+          query.description = searchRegex;
+        }
+        
+        // First get the listings without population
+        const rawListings = await this.listingModel.find(query)
+          .sort({ createdAt: -1 })
+          .exec();
+        
+        // Then populate only valid references
+        listings = await Promise.all(
+          rawListings.map(async (listing) => {
+            try {
+              // Only populate if IDs are valid
+              let populatedListing = listing;
+              
+              if (listing.providerId && Types.ObjectId.isValid(listing.providerId.toString())) {
+                populatedListing = await listing.populate('providerId', 'name phone');
+              }
+              
+              if (listing.categoryId && Types.ObjectId.isValid(listing.categoryId.toString())) {
+                populatedListing = await populatedListing.populate('categoryId', 'name');
+              }
+              
+              if (listing.subCategoryId && Types.ObjectId.isValid(listing.subCategoryId.toString())) {
+                populatedListing = await populatedListing.populate('subCategoryId', 'name');
+              }
+              
+              return populatedListing;
+            } catch (err) {
+              console.warn(`Warning: Could not populate listing ${listing._id}:`, err.message);
+              return listing; // Return unpopulated listing if population fails
+            }
+          })
+        );
       }
-
-      console.log('ListingsService.findAll - Final query:', JSON.stringify(cleanQuery, null, 2));
-      console.log('ListingsService.findAll - Executing query...');
-
-      const listings = await queryBuilder
-        .populate('categoryId', 'name')
-        .populate('subCategoryId', 'name')
-        .populate('providerId', 'name phone')
-        .sort({ createdAt: -1 }) // Most recent first
-        .exec();
-
-      // Transform all listings with pre-signed URLs
-      return Promise.all(listings.map(listing => this.transformWithUrls(listing)));
+      
+      // Transform all listings with public URLs
+      return listings.map(listing => this.transformWithPublicUrls(listing));
+      
     } catch (error) {
       console.error('ListingsService.findAll - Error:', error);
       throw new BadRequestException(`Failed to search listings: ${error.message}`);
     }
   }
 
-  // Helper method to parse and validate search filters
-  private parseSearchFilters(filters: any): any {
-    const parsed: any = {};
-    
-    // Parse boolean values
-    if (filters?.isActive !== undefined) {
-      parsed.isActive = filters.isActive === 'true' || filters.isActive === true;
-    }
-    
-    // Parse numeric values
-    if (filters?.priceMin !== undefined && filters.priceMin !== 'undefined' && filters.priceMin !== '') {
-      const priceMin = parseFloat(filters.priceMin);
-      parsed.priceMin = isNaN(priceMin) ? null : priceMin;
-    } else {
-      parsed.priceMin = null;
-    }
-    
-    if (filters?.priceMax !== undefined && filters.priceMax !== 'undefined' && filters.priceMax !== '') {
-      const priceMax = parseFloat(filters.priceMax);
-      parsed.priceMax = isNaN(priceMax) ? null : priceMax;
-    } else {
-      parsed.priceMax = null;
-    }
-    
-    // Parse coordinates
-    if (filters?.coordinates) {
-      if (typeof filters.coordinates === 'string') {
-        try {
-          parsed.coordinates = JSON.parse(filters.coordinates);
-        } catch (e) {
-          // Try parsing as comma-separated values
-          const coords = filters.coordinates.split(',').map(c => parseFloat(c.trim()));
-          if (coords.length === 2 && !coords.some(isNaN)) {
-            parsed.coordinates = coords;
-          }
-        }
-      } else if (Array.isArray(filters.coordinates)) {
-        parsed.coordinates = filters.coordinates.map(c => parseFloat(c));
-      }
-    } else if (filters?.latitude && filters?.longitude) {
-      // Handle case where app sends latitude/longitude separately
-      const lat = parseFloat(filters.latitude);
-      const lng = parseFloat(filters.longitude);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        parsed.coordinates = [lng, lat]; // MongoDB expects [longitude, latitude]
-      }
-    }
-    
-    // Handle radius/distance
-    if (filters?.distance !== undefined && filters.distance !== 'undefined' && filters.distance !== '') {
-      const distance = parseFloat(filters.distance);
-      parsed.distance = isNaN(distance) ? null : distance;
-    } else if (filters?.radius !== undefined && filters.radius !== 'undefined' && filters.radius !== '') {
-      // Handle case where app sends 'radius' instead of 'distance'
-      const radius = parseFloat(filters.radius);
-      parsed.distance = isNaN(radius) ? null : radius;
-    }
-    
-    // Copy string values as-is
-    if (filters?.searchText && filters.searchText !== 'undefined') {
-      parsed.searchText = filters.searchText;
-    } else if (filters?.text && filters.text !== 'undefined') {
-      // Handle case where app sends 'text' instead of 'searchText'
-      parsed.searchText = filters.text;
-    }
-    
-    if (filters?.categoryId && filters.categoryId !== 'undefined') {
-      parsed.categoryId = filters.categoryId;
-    }
-    
-    if (filters?.subCategoryId && filters.subCategoryId !== 'undefined') {
-      parsed.subCategoryId = filters.subCategoryId;
-    }
-    
-    if (filters?.providerId && filters.providerId !== 'undefined') {
-      parsed.providerId = filters.providerId;
-    }
-    
-    // PARSE excludeProviderId
-    if (filters?.excludeProviderId && filters.excludeProviderId !== 'undefined') {
-      parsed.excludeProviderId = filters.excludeProviderId;
-    }
-    
-    // Parse tags array
-    if (filters?.tags) {
-      if (typeof filters.tags === 'string') {
-        parsed.tags = [filters.tags];
-      } else if (Array.isArray(filters.tags)) {
-        parsed.tags = filters.tags;
-      }
-    }
-    
-    return parsed;
-  }
-
   async findNearby(coordinates: number[], maxDistance: number, excludeProviderId?: string): Promise<any[]> {
     const query: any = {
       isActive: true,
+      providerId: { $exists: true, $nin: [null, ''] }, // Add validation
       location: {
         $near: {
           $geometry: {
             type: 'Point',
             coordinates
           },
-          $maxDistance: maxDistance * 1000 // Convert km to meters
+          $maxDistance: maxDistance * 1000
         }
       }
     };
 
-    // Exclude listings from specific provider if provided
-    if (excludeProviderId) {
-      query.providerId = { $ne: excludeProviderId };
+    if (excludeProviderId && Types.ObjectId.isValid(excludeProviderId)) {
+      query.providerId.$ne = excludeProviderId;
     }
 
     const listings = await this.listingModel.find(query)
@@ -293,20 +341,29 @@ export class ListingsService {
       .populate('providerId', 'name phone')
       .exec();
 
-    return Promise.all(listings.map(listing => this.transformWithUrls(listing)));
+    return listings.map(listing => this.transformWithPublicUrls(listing));
   }
 
   async findByProvider(providerId: string): Promise<any[]> {
+    if (!Types.ObjectId.isValid(providerId)) {
+      throw new BadRequestException('Invalid provider ID');
+    }
+
     const listings = await this.listingModel
       .find({ providerId })
       .populate('categoryId', 'name')
       .populate('subCategoryId', 'name')
       .sort({ createdAt: -1 })
       .exec();
-    return Promise.all(listings.map(listing => this.transformWithUrls(listing)));
+    
+    return listings.map(listing => this.transformWithPublicUrls(listing));
   }
 
   async findById(id: string): Promise<any> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid listing ID');
+    }
+
     const listing = await this.listingModel
       .findByIdAndUpdate(
         id,
@@ -320,13 +377,16 @@ export class ListingsService {
       
     if (!listing) throw new NotFoundException('Listing not found');
     
-    return this.transformWithUrls(listing);
+    return this.transformWithPublicUrls(listing);
   }
 
   async update(id: string, dto: UpdateListingDto): Promise<any> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid listing ID');
+    }
+
     const updateData: any = { ...dto };
     
-    // Handle both coordinate formats for update as well
     if (dto.location && dto.location.coordinates) {
       updateData.location = {
         type: 'Point',
@@ -349,56 +409,62 @@ export class ListingsService {
       
     if (!updated) throw new NotFoundException('Listing not found');
     
-    return this.transformWithUrls(updated);
+    return this.transformWithPublicUrls(updated);
   }
 
   async delete(id: string): Promise<Listing> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid listing ID');
+    }
+
+    const listing = await this.listingModel.findById(id).exec();
+    if (!listing) throw new NotFoundException('Listing not found');
+    
+    // Delete images from S3
+    if (listing.photos && listing.photos.length > 0) {
+      await this.s3Service.deleteFiles(listing.photos);
+    }
+    
     const removed = await this.listingModel.findByIdAndDelete(id).exec();
-    if (!removed) throw new NotFoundException('Listing not found');
     return removed;
   }
 
   async incrementBookingCount(listingId: string): Promise<void> {
+    if (!Types.ObjectId.isValid(listingId)) {
+      throw new BadRequestException('Invalid listing ID');
+    }
+
     await this.listingModel.findByIdAndUpdate(
       listingId,
       { $inc: { bookingCount: 1 } }
     );
   }
 
-  // Helper method to transform listing with pre-signed URLs
-  private async transformWithUrls(listing: ListingDocument): Promise<any> {
-    const listingObj = listing.toObject();
+  /**
+   * Transform listing with public URLs (NOT async anymore!)
+   * This is now a synchronous operation since we're not generating presigned URLs
+   */
+  private transformWithPublicUrls(listing: ListingDocument | any): any {
+    const listingObj = typeof listing.toObject === 'function' ? listing.toObject() : listing;
     
-    // Generate pre-signed URLs for all photos
+    // Generate public URLs for all photos (synchronous!)
     if (listing.photos && listing.photos.length > 0) {
-      const photoUrls = await Promise.all(
-        listing.photos.map(key => this.s3Service.getPresignedUrl(key))
-      );
-      listingObj.photoUrls = photoUrls;
+      listingObj.photoUrls = this.s3Service.getPublicUrls(listing.photos);
     } else {
       listingObj.photoUrls = [];
     }
     
-    // Remove the S3 keys from the response
-    delete listingObj.photos;
+    // Optionally keep the S3 keys (useful for delete operations)
+    // delete listingObj.photos;
     
     return listingObj;
   }
 
-  // New method to refresh URLs for a specific listing
-  async refreshUrls(listingId: string): Promise<{ photoUrls: string[] }> {
-    const listing = await this.listingModel.findById(listingId).exec();
-    if (!listing) throw new NotFoundException('Listing not found');
-    
-    const photoUrls = await Promise.all(
-      listing.photos.map(key => this.s3Service.getPresignedUrl(key))
-    );
-    
-    return { photoUrls };
-  }
-
-  // Method to toggle listing status
   async toggleListingStatus(id: string, isActive: boolean): Promise<any> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid listing ID');
+    }
+
     const updated = await this.listingModel
       .findByIdAndUpdate(id, { isActive }, { new: true })
       .populate('categoryId')
@@ -408,6 +474,166 @@ export class ListingsService {
       
     if (!updated) throw new NotFoundException('Listing not found');
     
-    return this.transformWithUrls(updated);
+    return this.transformWithPublicUrls(updated);
+  }
+
+  // Helper method to parse search filters
+  private parseSearchFilters(filters: any): any {
+    const parsed: any = {};
+    
+    if (filters?.isActive !== undefined) {
+      parsed.isActive = filters.isActive === 'true' || filters.isActive === true;
+    }
+    
+    if (filters?.priceMin !== undefined && filters.priceMin !== 'undefined' && filters.priceMin !== '') {
+      const priceMin = parseFloat(filters.priceMin);
+      parsed.priceMin = isNaN(priceMin) ? null : priceMin;
+    } else {
+      parsed.priceMin = null;
+    }
+    
+    if (filters?.priceMax !== undefined && filters.priceMax !== 'undefined' && filters.priceMax !== '') {
+      const priceMax = parseFloat(filters.priceMax);
+      parsed.priceMax = isNaN(priceMax) ? null : priceMax;
+    } else {
+      parsed.priceMax = null;
+    }
+    
+    if (filters?.coordinates) {
+      if (typeof filters.coordinates === 'string') {
+        try {
+          parsed.coordinates = JSON.parse(filters.coordinates);
+        } catch (e) {
+          const coords = filters.coordinates.split(',').map(c => parseFloat(c.trim()));
+          if (coords.length === 2 && !coords.some(isNaN)) {
+            parsed.coordinates = coords;
+          }
+        }
+      } else if (Array.isArray(filters.coordinates)) {
+        parsed.coordinates = filters.coordinates.map(c => parseFloat(c));
+      }
+    } else if (filters?.latitude && filters?.longitude) {
+      const lat = parseFloat(filters.latitude);
+      const lng = parseFloat(filters.longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        parsed.coordinates = [lng, lat];
+      }
+    }
+    
+    if (filters?.distance !== undefined && filters.distance !== 'undefined' && filters.distance !== '') {
+      const distance = parseFloat(filters.distance);
+      parsed.distance = isNaN(distance) ? null : distance;
+    } else if (filters?.radius !== undefined && filters.radius !== 'undefined' && filters.radius !== '') {
+      const radius = parseFloat(filters.radius);
+      parsed.distance = isNaN(radius) ? null : radius;
+    }
+    
+    if (filters?.searchText && filters.searchText !== 'undefined') {
+      parsed.searchText = filters.searchText;
+    } else if (filters?.text && filters.text !== 'undefined') {
+      parsed.searchText = filters.text;
+    }
+    
+    if (filters?.categoryId && filters.categoryId !== 'undefined') {
+      parsed.categoryId = filters.categoryId;
+    }
+    
+    if (filters?.subCategoryId && filters.subCategoryId !== 'undefined') {
+      parsed.subCategoryId = filters.subCategoryId;
+    }
+    
+    if (filters?.providerId && filters.providerId !== 'undefined') {
+      parsed.providerId = filters.providerId;
+    }
+    
+    if (filters?.excludeProviderId && filters.excludeProviderId !== 'undefined' && filters.excludeProviderId !== '') {
+      parsed.excludeProviderId = filters.excludeProviderId;
+    }
+    
+    if (filters?.tags) {
+      if (typeof filters.tags === 'string') {
+        parsed.tags = [filters.tags];
+      } else if (Array.isArray(filters.tags)) {
+        parsed.tags = filters.tags;
+      }
+    }
+    
+    return parsed;
+  }
+
+  // Smart search method
+  async smartSearch(searchText: string, otherFilters?: Partial<SearchFilters>): Promise<{
+    listings: any[];
+    searchType: 'category' | 'subcategory' | 'description';
+    matchedTerm?: string;
+  }> {
+    const searchTerm = searchText.trim();
+    let searchType: 'category' | 'subcategory' | 'description' = 'description';
+    let matchedTerm: string | undefined;
+    
+    const categoryMatch = await this.catalogueModel.findOne({
+      name: new RegExp(`^${searchTerm}$`, 'i'),
+      parentId: null
+    } as any).exec();
+    
+    if (categoryMatch) {
+      searchType = 'category';
+      matchedTerm = categoryMatch.name;
+      const filters = {
+        ...otherFilters,
+        categoryId: categoryMatch._id.toString()
+      };
+      const listings = await this.findAll(filters);
+      return { listings, searchType, matchedTerm };
+    }
+    
+    const subCategoryMatch = await this.catalogueModel.findOne({
+      name: new RegExp(`^${searchTerm}$`, 'i'),
+      parentId: { $ne: null }
+    } as any).exec();
+    
+    if (subCategoryMatch) {
+      searchType = 'subcategory';
+      matchedTerm = subCategoryMatch.name;
+      const filters = {
+        ...otherFilters,
+        subCategoryId: subCategoryMatch._id.toString()
+      };
+      const listings = await this.findAll(filters);
+      return { listings, searchType, matchedTerm };
+    }
+    
+    const filters = {
+      ...otherFilters,
+      searchText: searchTerm
+    };
+    const listings = await this.findAll(filters);
+    return { listings, searchType };
+  }
+
+  // Add a method to clean up invalid listings (run this once to fix existing data)
+  async cleanupInvalidListings(): Promise<{ cleaned: number }> {
+    const result = await this.listingModel.deleteMany({
+      $or: [
+        { providerId: null },
+        { providerId: '' },
+        { providerId: { $exists: false } }
+      ]
+    });
+    
+    console.log(`Cleaned up ${result.deletedCount} listings with invalid providerIds`);
+    return { cleaned: result.deletedCount };
+  }
+
+  // DEPRECATED - This method is no longer needed!
+  async refreshUrls(listingId: string): Promise<{ photoUrls: string[] }> {
+    console.warn('⚠️  refreshUrls() is deprecated. URLs no longer expire with CloudFront.');
+    
+    const listing = await this.listingModel.findById(listingId).exec();
+    if (!listing) throw new NotFoundException('Listing not found');
+    
+    return { 
+      photoUrls: this.s3Service.getPublicUrls(listing.photos)
+    };
   }
 }

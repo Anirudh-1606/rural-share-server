@@ -54,6 +54,7 @@ export class CreateListingDto {
 
   @ValidateNested()
   @Type(() => LocationDto)
+  @IsOptional() 
   location: LocationDto;
 
   @IsNumber()

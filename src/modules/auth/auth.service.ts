@@ -40,10 +40,15 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const payload = { email: user.email, sub: user._id };
+    const payload = {
+      sub: user._id,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+    };
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshToken = this.generateRefreshToken(user._id);
-    
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -53,8 +58,8 @@ export class AuthService {
         id: user._id,
         email: user.email,
         name: user.name,
-        role: user.role
-      }
+        role: user.role,
+      },
     };
   }
 
@@ -159,7 +164,7 @@ export class AuthService {
 
   async refreshToken(refreshToken: string) {
     const tokenData = this.refreshTokens.get(refreshToken);
-    
+
     if (!tokenData) {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -177,11 +182,10 @@ export class AuthService {
     // Delete old refresh token
     this.refreshTokens.delete(refreshToken);
 
-    // Generate new tokens
+    // Generate new tokens with the same payload structure as login
     const payload = {
-      id: user._id,
-      email: user.email,
       sub: user._id,
+      email: user.email,
       phone: user.phone,
       role: user.role,
     };
@@ -192,7 +196,7 @@ export class AuthService {
     return {
       access_token: newAccessToken,
       refresh_token: newRefreshToken,
-      expires_in: 900, // 15 minutes in seconds
+      expires_in: 900,
       token_type: 'Bearer',
     };
   }

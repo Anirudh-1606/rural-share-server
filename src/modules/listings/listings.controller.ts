@@ -165,11 +165,13 @@ export class ListingsController {
     return this.svc.findByProvider(providerId);
   }
 
-  // Move refresh-urls BEFORE :id route
-  @Post(':id/refresh-urls')
-  refreshUrls(@Param('id') id: string) {
-    return this.svc.refreshUrls(id);
-  }
+  // ⚠️ REMOVED: refresh-urls endpoint is no longer needed!
+  // URLs from CloudFront never expire
+  
+  // @Post(':id/refresh-urls')  // <-- DELETE THIS
+  // refreshUrls(@Param('id') id: string) {
+  //   return this.svc.refreshUrls(id);
+  // }
 
   // This should be the LAST GET route as it matches any string
   @Get(':id')
